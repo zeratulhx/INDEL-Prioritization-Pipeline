@@ -1,0 +1,449 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-03-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+library(tidyr)
+library(dplyr)
+
+# set the path to the directory containing the files
+path <- "/home/briana/shared/ProcessedVEPInsertions/Test"
+
+# list all the text files in the directory
+files <- list.files(path, pattern = "\\.txt$", full.names = TRUE)
+
+
+# read and process each file, and combine the data into one table
+combined_df <- lapply(files, function(file) {
+  # read the file
+  vcf <- read.table(file, header = FALSE, comment.char = "#", sep = "\t")
+  
+  # split the 8th column into multiple columns
+  new_df <- separate(vcf, 8, into = paste0("col", 1:40), sep = "\\|")
+  
+  # add the file name as another column
+  new_df$file_name <- file
+  
+  # return the processed data
+  new_df
+}) %>% 
+  bind_rows() %>%
+  mutate(file_name = basename(file_name)) %>% 
+  select(file_name, everything())
+
+
+
+
+
+```
+
+
+
+```{r create split DB}
+
+df_split <- separate(combined_df, 'col1', into = c("EVENT", "PAIRID", "SVLEN","SVTYPE","CSQ"), sep = ";")
+df_split$SVLEN <- gsub("SVLEN=", "", df_split$SVLEN)
+df_split$SVLEN <- as.integer(df_split$SVLEN)
+df_split <-df_split %>% rename(ExistingVariant = 'col18')
+df_split <- subset(df_split, V1 != "chrM")
+
+
+
+
+
+```
+
+```{r}
+# Determine the length of the alt sequence
+new_df$alt_length <- nchar(new_df$V5)
+
+# Skip variants where the alt sequence is too short (not interested in insertions less than 3 bases)
+alt_length_threshold <- 3
+new_df<- subset(new_df, new_df$alt_length >= alt_length_threshold)
+
+# Convert the chromosome name to the RefSeq accession number
+chrom_to_accession <- list(chr1 = "NC_000001.11", chr2 = "NC_000002.12", chr3 = "NC_000003.12", chr4 = "NC_000004.12", chr5 = "NC_000005.10", chr6= "NC_000006.12", chr7 = "NC_000007.14", chr8= "NC_000008.11", chr9= "NC_000009.12", chr10 = "NC_000010.11", chr11 = "NC_000011.10", chr12 = "NC_000012.12", chr13 = "NC_000013.11", chr14 = "NC_000014.9", chr15 = "NC_000015.10", chr16 = "NC_000016.10", chr17 = "NC_000017.11", chr18 = "NC_000018.10", chr19 = "NC_000019.10", chr20 = "NC_000020.11", chr21 = "NC_000021.9", chr22 = "NC_000022.11", chrX = "NC_000023.11",chrY = "NC_000024.10") 
+
+
+new_df <- new_df[new_df$V1 %in% names(chrom_to_accession), ]
+new_df$accession <- chrom_to_accession[match(new_df$V1, names(chrom_to_accession))]
+
+# Define the start and end positions for the reference sequence
+new_df$start <- as.integer(new_df$V2) - 1
+new_df$end <- new_df$start + new_df$alt_length
+
+# Use system() to retrieve the reference sequences
+ref_fasta_path <- "/home/briana/shared/AdjacentSequence/ncbi-genomes-2023-04-08/GCF_000001405.40_GRCh38.p14_genomic.fna"
+threshold_factor <- 0.1
+new_df$ref_fasta_cmd_right <- paste0("samtools faidx ", ref_fasta_path, " ", new_df$accession, ":", new_df$start+1, "-", new_df$end)
+new_df$ref_seq_right <- sapply(new_df$ref_fasta_cmd_right, function(cmd) system(cmd, intern = TRUE)[2])
+new_df$ref_fasta_cmd_left <- paste0("samtools faidx ", ref_fasta_path, " ", new_df$accession, ":", new_df$start-new_df$alt_length, "-", new_df$start-1)
+new_df$ref_seq_left <- sapply(new_df$ref_fasta_cmd_left, function(cmd) system(cmd, intern = TRUE)[2])
+
+# Compare the alt and reference sequences using Levenshtein distance
+library(stringdist)
+new_df$lev_distance_right <- stringdist(new_df$ref_seq_right, new_df$V5, method = "lv", nthread = 4)
+new_df$lev_distance_left <- stringdist(new_df$ref_seq_left, new_df$V5, method = "lv", nthread = 4)
+
+
+# Append the new information as a new column to the variant line
+new_df$new_info_right <- ifelse(new_df$lev_distance_right != -1, paste0("Levenshtein=", new_df$lev_distance_right, "| Original sequence(right)=", new_df$ref_seq_right, ", Variant sequence=", new_df$V5), paste0("Levenshtein=", new_df$lev_distance_right, "|"))
+new_df$new_info_left <- ifelse(new_df$lev_distance_left != -1, paste0("Levenshtein=", new_df$lev_distance_left, "| Original sequence(left)=", new_df$ref_seq_left, ", Variant sequence=", new_df$V5), paste0("Levenshtein=", new_df$lev_distance_left, "|"))
+
+
+
+
+```
+
+
+```{r HIGH or MODERATE con}
+
+library(ggplot2)
+
+# Subset data to include only variants that start with "COS"
+combined_df_sub <- subset(combined_df, grepl("^COS", `Existing Variant`) & (`Consequence` == "HIGH" | `Consequence` == "MODERATE"))
+
+# Aggregate data by gene and variant and count the number of occurrences
+gene_counts <- aggregate(`Existing Variant` ~ Gene, data = combined_df_sub, FUN = function(x) length(x))
+
+# Order the genes by count of variants
+gene_counts_sorted <- gene_counts[order(gene_counts$`Existing Variant`, decreasing = TRUE), ]
+
+# Create bar plot
+highmodcos <- ggplot(gene_counts_sorted, aes(x = reorder(Gene, `Existing Variant`), y = `Existing Variant`, fill = `Existing Variant`)) +
+  geom_bar(stat = "identity") +
+  labs(fill = "Consequence\n by Count",x = "Gene", y = "HIGH and MODERATE Consequence count") +  theme_light() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size =20),axis.title.x = element_text(size = 20),
+        plot.title = element_text(hjust = 0.5, size = 20)) + 
+  ggtitle("VEP determined HIGH or MODERATE consequence MINTIE insertions with\n associated COSMIC entry in TCGA TARGET AML cohort")
+
+filepath <- "/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedVEPInsertions/FilesforRProcessing/ProcessingVEPOutput/Graphics/HIGHMODCOS.png" 
+png(filepath, width = 1300, height = 1100)
+plot(highmodcos)
+dev.off()
+
+
+
+
+```
+
+```{r}
+library(ggplot2) 
+library(ggthemes)
+
+# Subset rows where consequence is HIGH or MODERATE
+df_subset <- subset(combined_df, Consequence %in% c("HIGH", "MODERATE"))
+
+# Aggregate data by gene and consequence and count the number of occurrences
+gene_counts <- aggregate(Consequence ~ Gene, data = df_subset, FUN = function(x) length(x))
+
+# Order the genes by count of consequences and select top 20
+top_20_genes <- gene_counts[order(gene_counts$Consequence, decreasing = TRUE), ][1:50,]
+
+# Create bar plot
+topfifty <- ggplot(top_20_genes, aes(x = reorder(Gene, Consequence), y = Consequence, fill = Consequence)) +
+  geom_bar(stat = "identity") +
+  labs(fill = "Consequence\n by Count",x = "Gene", y = "HIGH and MODERATE Consequence Combined Count ", title = "VEP determined top 50 genes by count associated with MODERATE and HIGH consequence MINTIE insertions\n in TCGA TARGET AML cohort", ) +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 20),  plot.title = element_text(hjust = 0.5, size =40), axis.text.y = element_text(size = 20), axis.title.y = element_text(size=20), axis.title.x = element_text(size = 30))
+
+filepath <- "/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedVEPInsertions/FilesforRProcessing/ProcessingVEPOutput/Graphics/HIGHMODCOStop50.png"   
+png(filepath, width = 2000, height = 1800)
+plot(topfifty)
+dev.off()
+
+
+```
+
+
+
+```{r Insertion length distribution}
+
+distribution_plot <- ggplot(df_split, aes(x = SVLEN)) +
+  geom_histogram(alpha = 0.5, fill = "lightgreen", color = "darkgreen", binwidth = 20, bins = 20) +
+  labs(y = "Count", x = "Insertion length (bp)",title = "Length distribution of MINTIE insertions\n in TCGA TARGET AML Cohort") +
+  theme_light() +
+  scale_y_log10() +
+  guides(x = guide_axis(angle = 90))
+
+modifieddistplot <- distribution_plot + 
+  theme(plot.title = element_text(size = 20,hjust = 0.5), 
+        axis.title.x = element_text(size = 15),
+        axis.title.y = element_text(size = 15), 
+        legend.position = "bottom"
+        )
+
+
+filepath <- "/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedVEPInsertions/FilesforRprocessing/ProcessingVEPOutput/Graphics/InsertionLengthDistribution.png" 
+png(filepath, width = 1300, height = 1100)
+plot(modifieddistplot)
+dev.off()
+
+
+```
+
+
+
+
+```{r fig.height = 10, fig.width = 5}
+
+library(dplyr)
+
+genes <- df_split %>% 
+  filter(Consequence %in% c("MODERATE", "HIGH")) %>% 
+  group_by(Gene) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count)) %>% 
+  head(26) %>% 
+  pull(Gene)
+
+
+gene_df <- data.frame(genes)
+write.csv(gene_df,"/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedDeletions/TopGenes.png/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedDeletions/DeletionLengthDistribution.png", row.names = FALSE)
+
+
+
+```
+
+```{r}
+library(dplyr)
+
+# Filter for genes with COSV entries and moderate/high consequences
+genes <- df_split %>%
+  filter(grepl("COSV", `Existing Variant`) & Consequence %in% c("MODERATE", "HIGH")) %>%
+  group_by(Gene, `Existing Variant`) %>%
+  summarize(count = n()) %>%
+  ungroup()
+
+# Write the list of genes to a CSV file
+write.csv(genes, "/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedDeletions/cosmic.csv", row.names = FALSE)
+
+
+
+```
+
+```{r fig.height = 60, fig.width = 30}
+library(ggplot2)
+
+# Subset the data to include HIGH, MODERATE, and LOW consequence variants
+df_filtered <- df_split[df_split$Consequence %in% c("HIGH", "MODERATE"),]
+
+# Aggregate the data by GenomicImpact
+agg_data <- aggregate(file_name ~ GenomicImpact, data = df_filtered, FUN = length)
+
+# Create the bar chart
+genomicimpactnomodifier <- ggplot(agg_data, aes(x = GenomicImpact, y = file_name, fill = GenomicImpact)) + theme_light() +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "HIGH and MODERATE MINTIE deletion\n genomic impact distribution in TCGA TARGET AML",
+       x = "Genomic Impact",
+       y = "Count") + 
+  theme(plot.title = element_text(hjust = 0.5, size = 20),
+        axis.text.x = element_text(angle = 45, hjust = 1, size =15),
+        axis.title.x =element_text(size =20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 15),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 14))
+
+
+
+
+filepath <- "/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedDeletions/GenomicImpactNoModifier.png" 
+png(filepath, width = 1300, height = 1100)
+plot(genomicimpactnomodifier)
+dev.off()
+
+
+
+
+
+```
+
+```{r fig.height = 50, fig.width = 25}
+# Create a new column to store the updated existing variant entries
+df_split$UpdatedExistingVariant <- ""
+
+# Loop through each row in the df_split data frame
+for(i in 1:nrow(df_split)) {
+  
+  # Check if the existing variant contains "COSV" or "RS" or both
+  has_cosv <- grepl("COSV", df_split[i, "Existing Variant"])
+  has_rs <- grepl("rs", df_split[i, "Existing Variant"])
+  
+  # Assign a value to the UpdatedExistingVariant column based on the presence of "COSV" and "RS"
+  if(has_cosv & has_rs) {
+    df_split[i, "UpdatedExistingVariant"] <- "COS&rs"
+  } else if(has_cosv) {
+    df_split[i, "UpdatedExistingVariant"] <- "COSV"
+  } else if(has_rs) {
+    df_split[i, "UpdatedExistingVariant"] <- "rs"
+  } else if(df_split[i, "Existing Variant"] == "N/A") {
+    df_split[i, "UpdatedExistingVariant"] <- "NONE"
+  } else {
+    df_split[i, "UpdatedExistingVariant"] <- "Other"
+  }
+}
+
+# Create a new data frame with the ExistingVariant, UpdatedExistingVariant, and Consequence columns
+df_existing <- df_split[, c("Existing Variant", "UpdatedExistingVariant", "Consequence", "GenomicImpact")]
+
+
+
+```
+
+
+```{r fig.height = 1000, fig.width = 500}
+library(ggplot2)
+
+df_existing <- df_existing[df_existing$Consequence != "MODIFIER",]
+
+library(ggplot2)
+
+# Count the number of variants for each value in the UpdatedExistingVariant column
+agg_data <- aggregate(df_existing$Consequence, 
+                      by = list(df_existing$UpdatedExistingVariant, df_existing$GenomicImpact), 
+                      FUN = length)
+names(agg_data) <- c("UpdatedExistingVariant", "GenomicImpact", "Count")
+
+# Create the bar chart
+databaseentries <- ggplot(agg_data, aes(x = UpdatedExistingVariant, y = Count, fill = GenomicImpact)) +
+  geom_bar(stat = "identity") +
+   theme_light() +
+  labs(title = "VEP MODERATE and HIGH Consequence MINTIE deletions by associated database\n in TCGA TARGET AML",
+       x = "Database ",
+       y = "Count", fill="Genomic impact") +
+  theme(plot.title = element_text(hjust = 0.5, size = 35),
+        axis.text.x = element_text(angle = 45, hjust = 1, size =25),
+        axis.title.x =element_text(size =20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 25),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 14),
+        legend.position = "bottom", # Move the legend to the bottom
+        legend.box = "horizontal")  # Display the legend horizontally)
+
+filepath <- "/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedDeletions/HIMODINSbyDB.png" 
+png(filepath, width = 4000, height = 3800)
+plot(databaseentries)
+dev.off()
+
+
+```
+
+
+```{r fig.height = 250, fig.width = 175}
+
+
+# Aggregate the data by GenomicImpact
+agg_data <- aggregate(file_name ~ Consequence, data = df_split, FUN = length)
+
+# Create the bar chart
+genomicimpactnomodifier <- ggplot(agg_data, aes(x = Consequence, y = file_name)) + theme_light() +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Consequence distribution for MINTIE insertions in TCGA TARGET AML cohort",
+       x = "VEP determined Genomic Impact",
+       y = "Count") + 
+  theme(plot.title = element_text(hjust = 0.5, size = 30),
+        axis.text.x = element_text(angle = 45, hjust = 1, size =15),
+        axis.title.x =element_text(size =20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 15),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 14))
+
+
+
+
+filepath <- "/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedVEPInsertions/FilesforRprocessing/ProcessingVEPOutput/ConsequenceDistribution.png"  
+png(filepath, width = 1300, height = 1100)
+plot(genomicimpactnomodifier)
+dev.off()
+
+
+
+
+
+
+
+
+```
+
+
+```{r }
+library(ggplot2)
+
+# Filter out the rows where Consequence is "MODIFIER"
+df_filtered <- df_split[df_split$Consequence != "MODIFIER",]
+
+# Create the violin plot
+violin_plot <- ggplot(df_split, aes(x = Gene, y = SVLEN)) +
+  geom_violin(trim = FALSE) +
+  scale_y_continuous(name = "SVLEN") +
+  labs(title = "Distribution of deletion length by Gene") +
+  theme(plot.title = element_text(hjust = 0.5, size = 20))
+
+# Facet the violin plot by Gene
+violin_plot_faceted <- violin_plot + facet_wrap(~ Gene, scales = "free")
+
+
+filepath <- "/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedDeletions/consequencedistribution.png" 
+png(filepath, width = 20000, height = 10000)
+plot(violin_plot_faceted)
+dev.off()
+
+
+```
+
+```{r }
+library(ggplot2)
+
+# Create bar graph with counts
+consequence_plot <- ggplot(data = df_split, aes(x = Consequence, y = ..count..)) + theme_light() +
+  geom_bar(fill = "darkgrey") +
+  labs(title = "Consequence distribution for MINTIE insertions in TCGA TARGET AML cohort", x = "VEP determined consequence", y = "Count") +
+  theme(plot.title = element_text(hjust = 0.5, size = 20))
+
+
+filepath <- "/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedVEPInsertions/FilesforRProcessing/ProcessingVEPOutput/Graphics/Insertion_Consequence_Distribution.png" 
+png(filepath, width = 1000, height = 800)
+plot(consequence_plot )
+dev.off()
+```
+
+
+```{r}
+
+#Read in COSMIC DB
+
+cosv_df <- read.table("C:/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/CosmicCompleteTargetedScreensMutantExport.tsv", sep = "\t", header = TRUE, fill = TRUE)
+```
+
+
+```{r}
+#Get relevant COS information from TSV database file 
+
+# Create a new column in df_split with the partial match value
+df_split$PartialMatch <- sapply(df_split$ExistingVariant, function(x) cosv_df$GENOMIC_MUTATION_ID[grep(x, cosv_df$GENOMIC_MUTATION_ID)])
+
+# Merge the two data frames based on the PartialMatch column
+merged_df <- merge(df_split, cosv_df, by.x = "PartialMatch", by.y = "GENOMIC_MUTATION_ID")
+
+# Print the merged data frame
+print(merged_df)
+
+```
+

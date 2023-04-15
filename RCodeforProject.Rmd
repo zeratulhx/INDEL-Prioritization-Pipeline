@@ -658,7 +658,52 @@ dev.off()
 ```
 
 
-`
+```{r}
+
+# filter rows based on conditions and create new dataframe
+low_lev_score_df <- df_split[(df_split$lev_distance_right_scaled < 0.2 | 
+                            df_split$lev_distance_left_scaled < 0.2) & 
+                            (df_split$col18 == "") &
+                            (df_split$col3 %in% c("MODERATE", "HIGH")) & 
+                            (df_split$col3 != "MODIFIER"),]
+
+
+library(ggplot2)
+
+# count the number of occurrences for each gene and score type
+gene_counts <- low_lev_score_df %>%
+  group_by(col4) %>%
+  summarise(right_score_count = sum(lev_distance_right_scaled < 0.2),
+            left_score_count = sum(lev_distance_left_scaled < 0.2))
+
+# sort genes by right_score_count and select top 10
+top_genes_right <- gene_counts[order(gene_counts$right_score_count, decreasing = TRUE),][1:10,]
+# sort genes by left_score_count and select top 10
+top_genes_left <- gene_counts[order(gene_counts$left_score_count, decreasing = TRUE),][1:10,]
+
+# create a bar graph of top genes by right_score_count
+lev_right_plot <- ggplot(top_genes_right, aes(x = reorder(col4, -right_score_count), y = right_score_count)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Top Genes by Levenshtein Distance Right Score Count (<= 0.2)") +
+  xlab("Gene") +
+  ylab("Count")
+
+
+
+# create a bar graph of top genes by left_score_count
+ lev_plot_left <- ggplot(top_genes_left, aes(x = reorder(col4, -left_score_count), y = left_score_count)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Top Genes by Levenshtein Distance Left Score Count (<= 0.2)") +
+  xlab("Gene") +
+  ylab("Count")
+
+
+
+
+
+
+```
+
 
 
 ```{r}
@@ -706,12 +751,12 @@ gene_counts <- filtered_df %>%
   filter(num_variants >= 50)
 
 # Join with the filtered_df to get the lines used to make the plot
-table_df <- filtered_df %>%
+table_df_lev <- filtered_df %>%
   filter(col34 %in% gene_counts$col34) %>%
   select(file_name, col4, lev_distance_left_scaled, new_info_left, lev_distance_right_scaled, new_info_right)
 
 # View the resulting table
-table_df
+table_df_lev
 
 write.csv(table_df, file = "/home/briana/shared/AdjacentSequence/adjacentnoveltable.csv", row.names = FALSE, )
 ```
@@ -743,7 +788,7 @@ write.csv(table_df, file = "/home/briana/shared/AdjacentSequence/adjacentexistin
 
 ```{r}
 
-#This block creates a stacked bar plot showing the genomic insertion and insertion count 
+#This block creates a stacked bar plot showing the genomic impact and insertion count 
 library(ggplot2) 
 library(ggthemes)
 
@@ -775,14 +820,13 @@ dev.off()
 ```
 
 ```{r}
-#Create result_df_summary
-
-
-
 
 ```
 
 ```{r}
+#Save results of interest to PDF
+
+
 library(gridExtra)
 library(grid)
 
@@ -795,7 +839,7 @@ max_primary_histology <- results_df_gene_summary$Primary_histology[which.max(res
 max_subtype <- results_df_gene_summary$Histology_subtype[which.max(results_df_gene_summary$Count)]
 
 # Create the PDF and add the title
-pdf("/home/briana/shared/test_two.pdf", height=10, width=30)
+pdf("/home/briana/shared/test_two.pdf", height=20, width=35)
 grid.text(paste("The highest histology by COSV id count is: ", max_primary_histology, " and the highest histology subtype by unique COSV id count is: ", max_subtype, ".\n All COSV identifiers included here are linked to mutations in genes listed in the Cancer Gene Census (http://cancer.sanger.ac.uk/census)"), x=0.5, y=0.95, gp=gpar(fontsize=20))
 grid.table(results_df_gene_summary)
 
@@ -823,6 +867,21 @@ for (i in 1:num_pages) {
   grid.text(paste("Samples linked to genes in the Cancer Census database. Page ", i), x=0.5, y=0.95, gp=gpar(fontsize=20))
   grid.draw(table_grob)
 }
+
+
+grid.newpage()
+grid.draw(topfifty)
+
+grid.newpage()
+
+grid.arrange(
+  lev_right_plot , lev_plot_left , ncol = 2,
+  widths = c(1, 1), heights = c(1, 1)
+)
+grid.text(paste("A first approach at detecting ITD/duplications. ScanITD (2020) used a string comparsion algorithm to detect ITDs. My approach might be wrong so have not checked too closely.\n Top HIGH and MODERATE variants with no DB entry by Levenshtein ratio count. The left and right sequence of the point of insertion was taken then a Levenshtein score generated.\n This was then divided by the length of the variant to account for longer variants having greater changes (as opposed to a single score cut-off). Lower ratio scores mean greater similarity."),x=0.5, y=.3, gp=gpar(fontsize=30))
+
+
+
 
 # Close the PDF file
 dev.off()

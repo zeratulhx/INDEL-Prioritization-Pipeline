@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "Automated ITD prioritiser"
 output: html_document
 date: "2023-03-25"
 ---
@@ -14,7 +14,7 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
+```{r }
 library(tidyr)
 library(dplyr)
 
@@ -53,12 +53,61 @@ combined_df <- lapply(files, function(file) {
 
 ```{r create split DB}
 
+library(dplyr)
+
+
 df_split <- separate(combined_df, 'col1', into = c("EVENT", "PAIRID", "SVLEN","SVTYPE","CSQ"), sep = ";")
 df_split$SVLEN <- gsub("SVLEN=", "", df_split$SVLEN)
 df_split$SVLEN <- as.integer(df_split$SVLEN)
 df_split <-df_split %>% rename(ExistingVariant = 'col18')
-df_split <- subset(df_split, V1 != "chrM")
+df_split <- subset(df_split, V1 != "chrM") #Remove mitochondrial information
+df_split <- df_split %>% 
+  mutate(id = row_number())
 
+
+
+
+
+
+```
+
+```{r} 
+#This block determines the Levenshtein score for the data frame for each variant, when comparing the variant to the left and right sequence at the insertion point. 
+
+# Determine the length of the alt sequence
+df_split$alt_length <- nchar(df_split$V5)
+
+# Skip variants where the alt sequence is too short (not interested in insertions less than 3 bases)
+alt_length_threshold <- 3
+df_split<- subset(df_split, df_split$alt_length >= alt_length_threshold)
+
+# Convert the chromosome name to the RefSeq accession number
+chrom_to_accession <- list(chr1 = "NC_000001.11", chr2 = "NC_000002.12", chr3 = "NC_000003.12", chr4 = "NC_000004.12", chr5 = "NC_000005.10", chr6= "NC_000006.12", chr7 = "NC_000007.14", chr8= "NC_000008.11", chr9= "NC_000009.12", chr10 = "NC_000010.11", chr11 = "NC_000011.10", chr12 = "NC_000012.12", chr13 = "NC_000013.11", chr14 = "NC_000014.9", chr15 = "NC_000015.10", chr16 = "NC_000016.10", chr17 = "NC_000017.11", chr18 = "NC_000018.10", chr19 = "NC_000019.10", chr20 = "NC_000020.11", chr21 = "NC_000021.9", chr22 = "NC_000022.11", chrX = "NC_000023.11",chrY = "NC_000024.10") 
+
+
+df_split <- df_split[df_split$V1 %in% names(chrom_to_accession), ]
+df_split$accession <- chrom_to_accession[match(df_split$V1, names(chrom_to_accession))]
+
+# Define the start and end positions for the reference sequence
+df_split$start <- as.integer(df_split$V2) - 1
+df_split$end <- df_split$start + df_split$alt_length
+
+# Use system() to retrieve the reference sequences
+ref_fasta_path <- "/home/briana/shared/AdjacentSequence/ncbi-genomes-2023-04-08/GCF_000001405.40_GRCh38.p14_genomic.fna"
+df_split$ref_fasta_cmd_right <- paste0("samtools faidx ", ref_fasta_path, " ", df_split$accession, ":", df_split$start+1, "-", df_split$end)
+df_split$ref_seq_right <- sapply(df_split$ref_fasta_cmd_right, function(cmd) system(cmd, intern = TRUE)[2])
+df_split$ref_fasta_cmd_left <- paste0("samtools faidx ", ref_fasta_path, " ", df_split$accession, ":", df_split$start-df_split$alt_length, "-", df_split$start-1)
+df_split$ref_seq_left <- sapply(df_split$ref_fasta_cmd_left, function(cmd) system(cmd, intern = TRUE)[2])
+
+# Compare the alt and reference sequences using Levenshtein distance
+library(stringdist)
+df_split$lev_distance_right <- stringdist(df_split$ref_seq_right, df_split$V5, method = "lv", nthread = 4)
+df_split$lev_distance_left <- stringdist(df_split$ref_seq_left, df_split$V5, method = "lv", nthread = 4)
+
+
+# Append the new information as a new column to the variant line
+df_split$new_info_right <- ifelse(df_split$lev_distance_right != -1, paste0("Levenshtein=", df_split$lev_distance_right, "| Original sequence(right)=", df_split$ref_seq_right, ", Variant sequence=", df_split$V5), paste0("Levenshtein=", df_split$lev_distance_right, "|"))
+df_split$new_info_left <- ifelse(df_split$lev_distance_left != -1, paste0("Levenshtein=", df_split$lev_distance_left, "| Original sequence(left)=", df_split$ref_seq_left, ", Variant sequence=", df_split$V5), paste0("Levenshtein=", df_split$lev_distance_left, "|"))
 
 
 
@@ -66,47 +115,231 @@ df_split <- subset(df_split, V1 != "chrM")
 ```
 
 ```{r}
-# Determine the length of the alt sequence
-new_df$alt_length <- nchar(new_df$V5)
+#This block calculates a ratio of the score over the length of the variant to account for an increased number of of changes in longer variants, and adds this information to the data frame.
 
-# Skip variants where the alt sequence is too short (not interested in insertions less than 3 bases)
-alt_length_threshold <- 3
-new_df<- subset(new_df, new_df$alt_length >= alt_length_threshold)
+# Add scaled Levenshtein distances to df_split
+df_split$lev_distance_right_scaled <- df_split$lev_distance_right / nchar(df_split$V5)
+df_split$lev_distance_left_scaled <- df_split$lev_distance_left / nchar(df_split$V5)
+```
 
-# Convert the chromosome name to the RefSeq accession number
-chrom_to_accession <- list(chr1 = "NC_000001.11", chr2 = "NC_000002.12", chr3 = "NC_000003.12", chr4 = "NC_000004.12", chr5 = "NC_000005.10", chr6= "NC_000006.12", chr7 = "NC_000007.14", chr8= "NC_000008.11", chr9= "NC_000009.12", chr10 = "NC_000010.11", chr11 = "NC_000011.10", chr12 = "NC_000012.12", chr13 = "NC_000013.11", chr14 = "NC_000014.9", chr15 = "NC_000015.10", chr16 = "NC_000016.10", chr17 = "NC_000017.11", chr18 = "NC_000018.10", chr19 = "NC_000019.10", chr20 = "NC_000020.11", chr21 = "NC_000021.9", chr22 = "NC_000022.11", chrX = "NC_000023.11",chrY = "NC_000024.10") 
+```{r}
+#Returns data frame with information from COSMIC census database 
+library(RSQLite)
+library(dplyr)
+
+# Create a connection to your SQLite database
+con <- dbConnect(RSQLite::SQLite(), "/home/briana/shared/a_census_db.db")
+
+# Create a new dataframe called COSV_df that contains rows where ExistingVariant contains COSV and col3 contains "HIGH" or "MODERATE"
+COSV_df <- df_split %>% filter(grepl("COSV", ExistingVariant) & col3 %in% c("HIGH", "MODERATE"))
+
+# Define a function to extract the COSV ID from the ExistingVariant column
+extract_COSV <- function(variant) {
+  COSV_id <- gsub(".*(COSV\\d+).*", "\\1", variant)
+  return(COSV_id)
+}
+
+# Apply the extract_COSV function to the ExistingVariant column of COSV_df using lapply
+COSV_ids <- unlist(lapply(COSV_df$ExistingVariant, extract_COSV))
+
+get_gene_info <- function(COSV_id, db_conn) {
+  query <- paste0("SELECT `Gene name`,`Primary histology`, `Histology subtype 1`, `Histology subtype 2`,`Resistance mutation`, `Mutation somatic status`, GENOMIC_MUTATION_ID FROM a_census_table WHERE GENOMIC_MUTATION_ID = '", COSV_id, "'")
+  gene_info <- dbGetQuery(db_conn, query)
+  gene_info$`Histology subtype 2` <- as.character(gene_info$`Histology subtype 2`)
+  # Convert other columns as needed
+  return(gene_info)
+}
 
 
-new_df <- new_df[new_df$V1 %in% names(chrom_to_accession), ]
-new_df$accession <- chrom_to_accession[match(new_df$V1, names(chrom_to_accession))]
+# Apply the get_gene_info function to each COSV_id in the COSV_ids list using lapply, and combine the resulting data frames using bind_rows()
+gene_info_census_df <- bind_rows(lapply(COSV_ids, get_gene_info, db_conn = con))
 
-# Define the start and end positions for the reference sequence
-new_df$start <- as.integer(new_df$V2) - 1
-new_df$end <- new_df$start + new_df$alt_length
-
-# Use system() to retrieve the reference sequences
-ref_fasta_path <- "/home/briana/shared/AdjacentSequence/ncbi-genomes-2023-04-08/GCF_000001405.40_GRCh38.p14_genomic.fna"
-threshold_factor <- 0.1
-new_df$ref_fasta_cmd_right <- paste0("samtools faidx ", ref_fasta_path, " ", new_df$accession, ":", new_df$start+1, "-", new_df$end)
-new_df$ref_seq_right <- sapply(new_df$ref_fasta_cmd_right, function(cmd) system(cmd, intern = TRUE)[2])
-new_df$ref_fasta_cmd_left <- paste0("samtools faidx ", ref_fasta_path, " ", new_df$accession, ":", new_df$start-new_df$alt_length, "-", new_df$start-1)
-new_df$ref_seq_left <- sapply(new_df$ref_fasta_cmd_left, function(cmd) system(cmd, intern = TRUE)[2])
-
-# Compare the alt and reference sequences using Levenshtein distance
-library(stringdist)
-new_df$lev_distance_right <- stringdist(new_df$ref_seq_right, new_df$V5, method = "lv", nthread = 4)
-new_df$lev_distance_left <- stringdist(new_df$ref_seq_left, new_df$V5, method = "lv", nthread = 4)
+# Disconnect from the SQLite database
+dbDisconnect(con)
 
 
-# Append the new information as a new column to the variant line
-new_df$new_info_right <- ifelse(new_df$lev_distance_right != -1, paste0("Levenshtein=", new_df$lev_distance_right, "| Original sequence(right)=", new_df$ref_seq_right, ", Variant sequence=", new_df$V5), paste0("Levenshtein=", new_df$lev_distance_right, "|"))
-new_df$new_info_left <- ifelse(new_df$lev_distance_left != -1, paste0("Levenshtein=", new_df$lev_distance_left, "| Original sequence(left)=", new_df$ref_seq_left, ", Variant sequence=", new_df$V5), paste0("Levenshtein=", new_df$lev_distance_left, "|"))
+```
+
+
+
+```{r}
+#This block searches through the COSV_df and connects it to information in the gene_info_census dataframe using nested lists. 
+
+
+# Loop through each row in COSV_df
+for (i in 1:nrow(COSV_df)) {
+  # Get the values of file_name and ExistingVariant for this row
+  file_name <- COSV_df[i, "file_name"]
+  ExistingVariant <- unlist(strsplit(as.character(COSV_df[i, "ExistingVariant"]), ";"))
+  
+  # Separate out COSV IDs if there are multiple of them in the same cell
+  ExistingVariant <- unlist(strsplit(ExistingVariant, "&"))
+  
+  # Remove any "rs" values that are not cosmic values
+  ExistingVariant <- ExistingVariant[grepl("^COSV", ExistingVariant)]
+  
+  # Search for matching rows in gene_info_census_df based on each COSV value
+  matching_rows <- list()
+  for (j in 1:length(ExistingVariant)) {
+    matching_rows[[j]] <- subset(gene_info_census_df, grepl(ExistingVariant[j], GENOMIC_MUTATION_ID))
+  }
+  
+  # Combine the matching rows into a single dataframe
+  if (length(matching_rows) > 0) {
+    matching_df <- do.call(rbind, matching_rows)
+  } else {
+    matching_df <- data.frame()
+  }
+  
+  # Create a list containing file_name, ExistingVariant, and matching_rows
+  merged_list[[i]] <- list(file_name = file_name, ExistingVariant = ExistingVariant, matching_df = matching_df)
+}
+
+# Combine the lists in merged_list into a dataframe
+merged_df <- data.frame(do.call(rbind, merged_list))
 
 
 
 
 ```
 
+```{r}
+
+library(dplyr)
+library(tidyr)
+
+# Get the unique genomic mutation IDs and associated histology subtype 1, primary histology, and gene symbol
+unique_ids <- gene_info_census_df %>% 
+  distinct(GENOMIC_MUTATION_ID, .keep_all = TRUE) %>% 
+  select(GENOMIC_MUTATION_ID, `Histology subtype 1`, `Primary histology`, `Gene name`) %>%
+  mutate(Genomic_Mutation_and_Histology = GENOMIC_MUTATION_ID)
+
+# Get the counts of each histology subtype 1, primary histology, gene symbol and gene name combination
+counts <- unique_ids %>% 
+  count(`Histology subtype 1`, `Primary histology`, `Gene name`) %>%
+  arrange(desc(n))
+
+# Create a data frame to store the results
+results_df <- data.frame(Row_Num = integer(),
+                         Histology_subtype = character(),
+                         Primary_histology = character(),
+                         Gene_name = character(),
+                         Genomic_Mutation = character(),
+                         Count = integer(),
+                         stringsAsFactors = FALSE,
+                         row.names = NULL)
+
+# Populate the data frame with the results
+for (i in seq_len(nrow(counts))) {
+  histology_subtype <- counts$`Histology subtype 1`[i]
+  primary_histology <- counts$`Primary histology`[i]
+  gene_name <- counts$`Gene name`[i]
+  subset_df <- unique_ids %>%
+    filter(`Histology subtype 1` == histology_subtype & `Primary histology` == primary_histology & `Gene name` == gene_name)
+  genomic_mutations <- paste(subset_df$Genomic_Mutation_and_Histology, collapse = ", ")
+  count <- counts$n[i]
+  results_df <- rbind(results_df, data.frame(Row_Num = i,
+                                             Histology_subtype = histology_subtype,
+                                             Primary_histology = primary_histology,
+                                             Gene_name = gene_name,
+                                             COSV_Census_ID = genomic_mutations,
+                                             Count = count,
+                                             stringsAsFactors = FALSE))
+}
+
+# Replace Histology_subtype with row numbers
+results_df$Row_Num <- seq_len(nrow(results_df))
+results_df_gene_summary <- results_df[c("Row_Num", "Primary_histology",  "Histology_subtype", "Gene_name", "COSV_Census_ID" , "Count")]
+
+
+
+
+
+```
+
+
+```{r}
+#Generate results_df_summary_split
+library(tidyr)
+
+# use separate_rows() to split the cells in "COSV_Census_ID" column
+df_summary_split <- separate_rows(results_df_gene_summary, COSV_Census_ID, sep = ",")
+
+# print the updated dataframe
+print(df_summary_split)
+
+
+```
+
+```{r}
+library(data.table)
+library(stringr)
+
+id_list_COSV_Census_ID <- unique(df_summary_split$COSV_Census_ID)
+
+result_df <- data.frame(unique_cosv_census_id = character(),
+                         file_name = character(),
+                         stringsAsFactors = FALSE)
+
+for (i in id_list_COSV_Census_ID) {
+  
+  # check if the i value is a split COSV value
+  if (grepl("&", i)) {
+    # split the COSV value into separate values
+    i_split <- str_split(i, "&", simplify = TRUE)[, 1:2]
+    # create a regular expression to match either of the split values
+    i_regex <- paste0("^", i_split, "$", collapse = "|")
+    cat("Regex for", i, ":", i_regex, "\n")
+    # subset df_split using the regular expression
+    df_temp <- df_split[str_detect(df_split$col18, i_regex), ]
+  } else {
+    # if the i value is a single COSV value, simply subset df_split
+    df_temp <- df_split[df_split$col18 == i, ]
+  }
+  
+  if (nrow(df_temp) > 0) {
+    result_df <- rbind(result_df, data.frame(unique_cosv_census_id = i, 
+                                             file_name = df_temp$file_name,
+                                             stringsAsFactors = FALSE))
+  }
+}
+
+```
+
+
+
+```{r} 
+# Loop over the id_list_COSV_Census_ID
+# Create an empty data frame to store the matching rows
+
+matching_rows_df <- data.frame()
+
+my_list_trimmed <- lapply(id_list_COSV_Census_ID, trimws)
+
+for (i in my_list_trimmed) {
+  result <- grepl(i, df_split$col18)
+  matching_rows <- df_split[result, ]
+  if (nrow(matching_rows) > 0) {
+    matching_rows$i <- i
+    matching_rows_df <- rbind(matching_rows_df, matching_rows)
+  }
+}
+
+
+matching_Id_df <- subset(matching_Id_df, select = c(file_name, COSV, Gene))
+
+matching_Id_df <- matching_Id_df[order(matching_Id_df$file_name), ]
+
+
+  
+
+
+
+
+```
+
+
+#The following blocks are for data visualisation and table generation
 
 ```{r HIGH or MODERATE con}
 
@@ -425,25 +658,178 @@ dev.off()
 ```
 
 
+`
+
+
 ```{r}
+library(ggplot2)
 
-#Read in COSMIC DB
+# Filter the data frame to include only rows where ExistingVariant is blank and where the scaled Levenshtein distance scores are 0, and exclude modifier values in col3
+filtered_df <- subset(df_split, ExistingVariant == "" & (lev_distance_left_scaled == 0 | lev_distance_right_scaled == 0) & !(col3 %in% c("MODIFIER")))
 
-cosv_df <- read.table("C:/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/CosmicCompleteTargetedScreensMutantExport.tsv", sep = "\t", header = TRUE, fill = TRUE)
+# Convert fill variable to a factor and set labels
+filtered_df$fill_factor <- factor(ifelse(filtered_df$lev_distance_left_scaled == 0, "Left Scaled Score", "Right Scaled Score"), 
+                                  levels = c("Left Scaled Score", "Right Scaled Score"))
+
+genevariantplot <- ggplot(filtered_df, aes(x = col34, y = ..count.., fill = fill_factor)) +
+  geom_bar(position = position_dodge(width = 0.9), stat = "count") +
+  ggtitle("Genes containing Variants with Scaled Levenshtein Distance Scores of 0") +
+  xlab("Gene Name") +
+  ylab("Number of Variants") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_fill_manual(values = c("#0072B2", "#E69F00"), labels = c("Left Scaled Score", "Right Scaled Score"))
+
+# Increase spacing between bars
+genevariantplot = genevariantplot + theme(panel.spacing.x = unit(5, "cm"))
+
+
+
+# Save plot to file
+filepath <- "/home/briana/shared/AdjacentSequence/Geneswithduplicatedinsertions"
+png(filepath, width = 3000, height = 800)
+plot(genevariantplot)
+dev.off()
+
+
+
+```
+```{r}
+library(dplyr)
+
+# Filter the data frame to include only rows where ExistingVariant is blank and where the scaled Levenshtein distance scores are 0, and exclude modifier values in col3
+filtered_df <- subset(df_split, ExistingVariant == "" & (lev_distance_left_scaled <= .4 | lev_distance_right_scaled <= .4) & !(col3 %in% c("MODIFIER")))
+
+# Select only the genes with 50 or more Levenshtein scores of 0
+gene_counts <- filtered_df %>%
+  group_by(col34) %>%
+  summarise(num_variants = n()) %>%
+  filter(num_variants >= 50)
+
+# Join with the filtered_df to get the lines used to make the plot
+table_df <- filtered_df %>%
+  filter(col34 %in% gene_counts$col34) %>%
+  select(file_name, col4, lev_distance_left_scaled, new_info_left, lev_distance_right_scaled, new_info_right)
+
+# View the resulting table
+table_df
+
+write.csv(table_df, file = "/home/briana/shared/AdjacentSequence/adjacentnoveltable.csv", row.names = FALSE, )
+```
+
+```{r}
+library(dplyr)
+
+# Filter the data frame to include only rows where ExistingVariant is blank and where the scaled Levenshtein distance scores are 0, and exclude modifier values in col3
+filtered_df <- subset(df_split, ExistingVariant != "" & (lev_distance_left_scaled <= .4 | lev_distance_right_scaled <= .4) & !(col3 %in% c("MODIFIER")))
+
+# Select only the genes with 5 or more Levenshtein scores of 0 or less than or equal to 0.4
+gene_counts <- filtered_df %>%
+  group_by(col34) %>%
+  summarise(num_variants = sum(lev_distance_left_scaled <= 1 | lev_distance_right_scaled <= 1)) %>%
+  filter(num_variants >= 5)
+
+
+# Join with the filtered_df to get the lines used to make the plot
+table_df <- filtered_df %>%
+  filter(col34 %in% gene_counts$col34) %>%
+  select(file_name,col4,ExistingVariant,col3,V5,V1,V2, lev_distance_left_scaled, new_info_left, lev_distance_right_scaled, new_info_right)
+
+# View the resulting table
+table_df
+
+write.csv(table_df, file = "/home/briana/shared/AdjacentSequence/adjacentexistingtable.csv", row.names = FALSE, )
 ```
 
 
 ```{r}
-#Get relevant COS information from TSV database file 
 
-# Create a new column in df_split with the partial match value
-df_split$PartialMatch <- sapply(df_split$ExistingVariant, function(x) cosv_df$GENOMIC_MUTATION_ID[grep(x, cosv_df$GENOMIC_MUTATION_ID)])
+#This block creates a stacked bar plot showing the genomic insertion and insertion count 
+library(ggplot2) 
+library(ggthemes)
 
-# Merge the two data frames based on the PartialMatch column
-merged_df <- merge(df_split, cosv_df, by.x = "PartialMatch", by.y = "GENOMIC_MUTATION_ID")
+# Subset rows where consequence is HIGH or MODERATE
+df_subset <- subset(combined_df, col3 %in% c("HIGH", "MODERATE"))
 
-# Print the merged data frame
-print(merged_df)
+# Aggregate data by gene, consequence, and col2 and count the number of occurrences
+gene_counts <- aggregate(col3 ~ col4 + col2, data = df_subset, FUN = function(x) length(x))
+top_50_genes <- gene_counts[order(gene_counts$col3, decreasing = TRUE), ][1:100, ]
+
+
+# Create bar plot
+topfifty <- ggplot(top_50_genes, aes(x = reorder(col4, col3), y = col3, fill = col2)) +
+  geom_bar(stat = "identity") +
+  labs(fill = "Genomic Consequence\n by Count",x = "Gene", y = "HIGH and MODERATE Consequence Combined Count ", title = "VEP determined top 100 genes by count associated with MODERATE and HIGH consequence MINTIE insertions\n in TCGA TARGET AML cohort", ) +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 20), plot.title = element_text(hjust = 0.5, size = 40), axis.text.y = element_text(size = 20), axis.title.y = element_text(size = 20), axis.title.x = element_text(size = 30),
+        legend.text = element_text(size = 30), legend.title = element_text(size=35)) # Set font size of legend labels
+
+filepath <- "/home/briana/shared/HIGHMODCOStop50.png"   
+png(filepath, width = 3000, height = 2800)
+
+plot(topfifty)
+dev.off()
+
+
+
+
+```
+
+```{r}
+#Create result_df_summary
+
+
+
+
+```
+
+```{r}
+library(gridExtra)
+library(grid)
+
+#Generate PDF with summerized information 
+
+#Generate highest histology count from results_df_summary_split
+
+# Find the highest count Primary_histology and Histology_subtype
+max_primary_histology <- results_df_gene_summary$Primary_histology[which.max(results_df_gene_summary$Count)]
+max_subtype <- results_df_gene_summary$Histology_subtype[which.max(results_df_gene_summary$Count)]
+
+# Create the PDF and add the title
+pdf("/home/briana/shared/test_two.pdf", height=10, width=30)
+grid.text(paste("The highest histology by COSV id count is: ", max_primary_histology, " and the highest histology subtype by unique COSV id count is: ", max_subtype, ".\n All COSV identifiers included here are linked to mutations in genes listed in the Cancer Gene Census (http://cancer.sanger.ac.uk/census)"), x=0.5, y=0.95, gp=gpar(fontsize=20))
+grid.table(results_df_gene_summary)
+
+# Define the number of rows per page
+rows_per_page <- 30
+
+# Get the total number of rows in the data frame
+total_rows <- nrow(matching_Id_df)
+
+# Calculate the number of pages required to display all rows
+num_pages <- ceiling(total_rows / rows_per_page)
+
+# Loop through each page
+for (i in 1:num_pages) {
+  # Subset the data frame to the appropriate rows for this page
+  start_row <- (i - 1) * rows_per_page + 1
+  end_row <- min(start_row + rows_per_page - 1, total_rows)
+  page_df <- matching_Id_df[start_row:end_row, ]
+  
+  # Create a table grob for the page
+  table_grob <- tableGrob(page_df)
+  
+  # Draw the table on a new PDF page
+  grid.newpage()
+  grid.text(paste("Samples linked to genes in the Cancer Census database. Page ", i), x=0.5, y=0.95, gp=gpar(fontsize=20))
+  grid.draw(table_grob)
+}
+
+# Close the PDF file
+dev.off()
+
+
+
+
 
 ```
 

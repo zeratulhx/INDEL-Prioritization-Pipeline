@@ -317,7 +317,7 @@ matching_rows_df <- data.frame()
 my_list_trimmed <- lapply(id_list_COSV_Census_ID, trimws)
 
 for (i in my_list_trimmed) {
-  result <- grepl(i, df_split$col18)
+  result <- grepl(i, df_split$ExistingVariant)
   matching_rows <- df_split[result, ]
   if (nrow(matching_rows) > 0) {
     matching_rows$i <- i
@@ -326,7 +326,7 @@ for (i in my_list_trimmed) {
 }
 
 
-matching_Id_df <- subset(matching_Id_df, select = c(file_name, COSV, Gene))
+matching_Id_df <- subset(matching_rows_df, select = c(file_name, i, col4))
 
 matching_Id_df <- matching_Id_df[order(matching_Id_df$file_name), ]
 
@@ -339,7 +339,110 @@ matching_Id_df <- matching_Id_df[order(matching_Id_df$file_name), ]
 ```
 
 
+```{r}
+#Extract contig ID for VAF matching from matching_Id_df
+
+matching_contigs_df<- subset(matching_rows_df, select = c(file_name, V3, col4))
+matching_contigs_list <- matching_contigs_df[,2]
+write(matching_contigs_list, file = "/home/briana/shared/contigslistforCOSVgenes.txt")
+
+
+
+```
+
+
+```{r}
+#Import VAF values for COSV variants
+
+VAF_COSMIC_values <- read.table("/home/briana/shared/matchingVAFValuesforCOSV.txt", header = FALSE, sep = "\t")
+VAF_COSMIC_values <- VAF_COSMIC_values %>% rename("VAF" = V6)
+```
+
+
+```{r}
+#Remove extra genes from VAF_COSMIC_Values
+
+matching_Id_df_genes_list <- matching_Id_df$col4
+
+# Create new data frame to store matching rows
+COSV_genes_only_df <- data.frame()
+
+# Loop through column1 and check if each value is in the list
+for (value in VAF_COSMIC_values$V2) {
+  if (value %in% matching_Id_df_genes_list) {
+    # If value is in the list, add the corresponding row to the new data frame
+    COSV_genes_only_df <- rbind(COSV_genes_only_df, VAF_COSMIC_values[VAF_COSMIC_values$V2 == value, ])
+  }
+}
+
+# Print the new data frame
+COSV_genes_only_df
+
+```
+```{r}
+#Generate VAF plots for top 20 genes by count MODERATE and HIGH impact, no associated database entry 
+
+
+# Subset the data frame based on conditions
+new_df <- df_split[df_split$ExistingVariant == "" & 
+                   !(df_split$col3 %in% c("LOW", "MODIFIER")), ]
+
+# Count the frequency of col4 values and find the top n values
+top_vals <- names(sort(table(new_df$col4), decreasing = TRUE)[1:top_n])
+
+# Subset the data frame to keep rows with top col4 values
+new_df_top_20_noDB_genes <- new_df[new_df$col4 %in% top_vals, ]
+
+# Print the new data frame
+new_df_top_20_noDB_genes
+
+
+
+```
+```{r}
+#Extract contig ID for VAF matching from new_df_top_20_noDB_genes
+
+matching_contigs_df_no_COSV<- subset(new_df_top_20_noDB_genes, select = c(file_name, V3, col4))
+matching_contigs_df_no_COSV_list<- matching_contigs_df_no_COSV[,2]
+write(matching_contigs_df_no_COSV_list, file = "/home/briana/shared/contigslistfornoCOSVgenes.txt")
+
+
+```
+
+
 #The following blocks are for data visualisation and table generation
+
+
+```{r}
+#Generate VAF plot for genes in COSMIC census 
+
+
+# Load the ggplot2 package
+# Load the ggplot2 package
+library(ggplot2)
+
+COSV_genes_only_df$V2 <- factor(COSV_genes_only_df$V2)
+
+# Create the facet-wrapped box plots
+VAFforCOSMICCensus <- ggplot(COSV_genes_only_df, aes(x = V2, y = VAF)) +  # swapped x and y
+  geom_boxplot() +
+  labs(x = "Genes", y = "VAF") +  # updated x and y labels
+  ggtitle("Estimated VAF scores for TCGA TARGET AML cohort genes found in the COSMIC cancer census database ") +
+  theme_bw() +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1, size = 20), plot.title = element_text(size = 30), axis.text.x = element_text(size = 20), axis.title.x = element_text(size = 30), axis.title.y = element_text(size = 30))
+
+# Save plot to file
+filepath <- "/home/briana/shared/VAFDistribution.png"
+ggsave(filepath, width = 20, height = 10, dpi = 300)
+
+
+
+
+
+
+
+```
+
 
 ```{r HIGH or MODERATE con}
 
@@ -663,7 +766,7 @@ dev.off()
 # filter rows based on conditions and create new dataframe
 low_lev_score_df <- df_split[(df_split$lev_distance_right_scaled < 0.2 | 
                             df_split$lev_distance_left_scaled < 0.2) & 
-                            (df_split$col18 == "") &
+                            (df_split$ExistingVariant == "") &
                             (df_split$col3 %in% c("MODERATE", "HIGH")) & 
                             (df_split$col3 != "MODIFIER"),]
 
@@ -820,6 +923,12 @@ dev.off()
 ```
 
 ```{r}
+#Export matching_Id_df 
+
+sample_name <- matching_Id_df[, 1]
+
+write.table(sample_name, "/home/briana/shared/matchingdata.txt", sep = "\t", row.names = FALSE)
+
 
 ```
 
@@ -839,8 +948,8 @@ max_primary_histology <- results_df_gene_summary$Primary_histology[which.max(res
 max_subtype <- results_df_gene_summary$Histology_subtype[which.max(results_df_gene_summary$Count)]
 
 # Create the PDF and add the title
-pdf("/home/briana/shared/test_two.pdf", height=20, width=35)
-grid.text(paste("The highest histology by COSV id count is: ", max_primary_histology, " and the highest histology subtype by unique COSV id count is: ", max_subtype, ".\n All COSV identifiers included here are linked to mutations in genes listed in the Cancer Gene Census (http://cancer.sanger.ac.uk/census)"), x=0.5, y=0.95, gp=gpar(fontsize=20))
+pdf("/home/briana/shared/test_two.pdf", height=20, width=38)
+grid.text(paste("The highest histology by COSV id count is: ", max_primary_histology, " and the highest histology subtype by unique COSV id count is: ", max_subtype, ".\n All COSV identifiers included here are linked to mutations in genes listed in the Cancer Gene Census (http://cancer.sanger.ac.uk/census)\n 'The Cancer Gene Census (CGC) is an ongoing effort to catalogue those genes which contain mutations that have been causally implicated in cancer and explain how dysfunction of these genes drives cancer.\n The content, the structure, and the curation process of the Cancer Gene Census was described and published in Nature Reviews Cancer'"), x=0.5, y=0.95, gp=gpar(fontsize=20))
 grid.table(results_df_gene_summary)
 
 # Define the number of rows per page
@@ -878,8 +987,10 @@ grid.arrange(
   lev_right_plot , lev_plot_left , ncol = 2,
   widths = c(1, 1), heights = c(1, 1)
 )
-grid.text(paste("A first approach at detecting ITD/duplications. ScanITD (2020) used a string comparsion algorithm to detect ITDs. My approach might be wrong so have not checked too closely.\n Top HIGH and MODERATE variants with no DB entry by Levenshtein ratio count. The left and right sequence of the point of insertion was taken then a Levenshtein score generated.\n This was then divided by the length of the variant to account for longer variants having greater changes (as opposed to a single score cut-off). Lower ratio scores mean greater similarity."),x=0.5, y=.3, gp=gpar(fontsize=30))
+grid.text(paste("A first approach at detecting ITD/duplications. ScanITD (2020) used a simple string comparsion algorithm to detect ITDs. My approach might be wrong so have not checked too closely.\n Top HIGH and MODERATE variants with no DB entry by Levenshtein ratio count. The left and right sequence of the point of insertion was taken then a Levenshtein score generated.\n This was then divided by the length of the variant to account for longer variants having greater changes (as opposed to a single score cut-off).\n Lower ratio scores mean greater similarity between the variant and the sequence it's adjacent to."),x=0.5, y=.3, gp=gpar(fontsize=30))
 
+grid.newpage()
+grid.draw(VAFforCOSMICCensus)
 
 
 

@@ -340,22 +340,62 @@ matching_Id_df <- matching_Id_df[order(matching_Id_df$file_name), ]
 
 
 ```{r}
-#Extract contig ID for VAF matching from matching_Id_df
+#Extract contig ID for VAF matching from matching_Id_df - file name only - for COSVgenes - this also removes duplicates
 
-matching_contigs_df<- subset(matching_rows_df, select = c(file_name, V3, col4))
-matching_contigs_list <- matching_contigs_df[,2]
-write(matching_contigs_list, file = "/home/briana/shared/contigslistforCOSVgenes.txt")
+matching_contigs_df <- subset(matching_rows_df, select = c(file_name, V3))
+unique_file_names_df <- unique(matching_contigs_df["file_name"])
+write.table(unique_file_names_df, file = "/home/briana/shared/filelistforCOSVgenes.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
 
 
 
 ```
+
+```{r}
+#Extract filename and contig ID
+
+matching_contigs_df <- subset(matching_rows_df, select = c(file_name, V3))
+write.table(matching_contigs_df, file = "/home/briana/shared/contigslistforCOSVgenes.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+```
+
+
+
+```{r}
+#Extract file name to get results files for no database values
+
+matching_contigs_df_nodb<- subset(df_split_noDBENTRY, select = c(file_name, V3, col4))
+write.table(df_split_noDBENTRY["file_name"], file = "/home/briana/shared/filenamesnodb.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+#This removes duplicates from the file so we are not copying across so many results files 
+# Read in the text file
+matching_contig_namesnodb <- read.table("/home/briana/shared/filenamesnodb.txt", header = TRUE, sep = "\t")
+
+# Remove duplicates from the column
+unique_values_nodb <- unique(matching_contig_namesnodb$file_name)
+
+# Write the unique values to a new text file
+write.table(unique_values_nodb, file = "/home/briana/shared/filenamesnodbnoduplicates.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+
+
+```
+
+```{r}
+#Create text file with file name, contig_id for no db entry
+contigs_filename_nodb <- subset(df_split_noDBENTRY, select = c(file_name, V3))
+write.table(contigs_filename_nodb, file = "/home/briana/shared/filenamescontignodb.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+
+```
+
 
 
 ```{r}
 #Import VAF values for COSV variants
 
 VAF_COSMIC_values <- read.table("/home/briana/shared/matchingVAFValuesforCOSV.txt", header = FALSE, sep = "\t")
-VAF_COSMIC_values <- VAF_COSMIC_values %>% rename("VAF" = V6)
+names(VAF_COSMIC_values)[names(VAF_COSMIC_values) == "V6"] <- "VAF"
 ```
 
 
@@ -379,8 +419,10 @@ for (value in VAF_COSMIC_values$V2) {
 COSV_genes_only_df
 
 ```
+
+
 ```{r}
-#Generate VAF plots for top 20 genes by count MODERATE and HIGH impact, no associated database entry 
+#Generate VAF dataframe for top 20 genes by count MODERATE and HIGH impact, no associated database entry 
 
 
 # Subset the data frame based on conditions
@@ -388,7 +430,7 @@ new_df <- df_split[df_split$ExistingVariant == "" &
                    !(df_split$col3 %in% c("LOW", "MODIFIER")), ]
 
 # Count the frequency of col4 values and find the top n values
-top_vals <- names(sort(table(new_df$col4), decreasing = TRUE)[1:top_n])
+top_vals <- names(sort(table(new_df$col4), decreasing = TRUE)[1:20])
 
 # Subset the data frame to keep rows with top col4 values
 new_df_top_20_noDB_genes <- new_df[new_df$col4 %in% top_vals, ]
@@ -399,6 +441,8 @@ new_df_top_20_noDB_genes
 
 
 ```
+
+
 ```{r}
 #Extract contig ID for VAF matching from new_df_top_20_noDB_genes
 
@@ -410,14 +454,317 @@ write(matching_contigs_df_no_COSV_list, file = "/home/briana/shared/contigslistf
 ```
 
 
+```{r}
+#Import VAF values for  no COSV variants
+
+VAF_noCOSMIC_values <- read.table("/home/briana/shared/matchingVAFValuesfornoCOSV.txt", header = FALSE, sep = "\t")
+names(VAF_noCOSMIC_values)[names(VAF_noCOSMIC_values) == "V6"] <- "VAF"
+
+```
+
+```{r}
+#Remove extra genes from VAF_noCOSMIC_Values (due to duplications in contig ID)
+
+matching_ID_df_noCOSVgenes_list <- new_df_top_20_noDB_genes$col4
+
+# Load dplyr package
+library(dplyr)
+
+# Filter the rows where V2 value is in matching_ID_df_noCOSVgenes_list
+filtered_VAF_noCOSMIC_values <- VAF_noCOSMIC_values %>%
+  filter(V2 %in% matching_ID_df_noCOSVgenes_list)
+
+
+```
+
+```{r}
+#Import example result file from MINTIE to check column headings 
+
+exampleresultfile<- read.csv("/home/briana/shared/TestFile/dupe_realn_results.tsv", header = TRUE, sep = "",  na.strings = "NA","")
+exampleresultfile <- exampleresultfile[exampleresultfile$variant_type == "NE", ]
+
+```
+
+```{r}
+#Import result file for insertions with COS data base entries 
+library(dplyr)
+
+result_lines_from_hpc_COSV <- read.csv("/home/briana/shared/VAFAnalysis/resultlinesforCOSV.txt", header = FALSE, sep = "", na.strings = "NA")
+result_lines_from_hpc_COSV  <- result_lines_from_hpc_COSV [result_lines_from_hpc_COSV $V8 == "INS", ]
+colnames(result_lines_from_hpc_COSV )[32] <- "case_reads"
+colnames(result_lines_from_hpc_COSV )[33] <- "controls_total_reads"
+colnames(result_lines_from_hpc_COSV )[9] <- "genes"
+colnames(result_lines_from_hpc_COSV )[14] <- "VAF"
+
+gene_counts_lines_COSV <- result_lines_from_hpc_COSV  %>%
+  group_by(genes) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  top_n(20, count)
+
+
+#Filter for variants with over 1000 case reads and over 500 control_total_reads
+
+result_lines_from_hpc_COSV$controls_total_reads <- as.numeric(result_lines_from_hpc_COSV$controls_total_reads)
+
+filtered_result_lines_COSV <- result_lines_from_hpc_COSV %>%
+  filter(case_reads > 100, 
+         !is.na(controls_total_reads),
+         controls_total_reads > 25,
+         VAF >= 0.1)
+
+
+gene_counts_lines_from_hpc_filtered_COSV <- filtered_result_lines_COSV %>%
+  group_by(genes) %>%
+  summarise(count = n(), 
+            avg_vaf = mean(VAF), 
+            avg_case_reads = mean(case_reads),
+            avg_controls_total_reads = mean(controls_total_reads)) %>%
+  arrange(desc(count)) %>%
+  top_n(20, count)
+
+
+
+```
+
+
+```{r}
+#Import result file for insertions with no data base entries 
+library(dplyr)
+
+result_lines_from_hpc_noDB <- read.csv("/home/briana/shared/VAFAnalysis/resultlinesnoDB.txt", header = FALSE, sep = "", na.strings = "NA")
+result_lines_from_hpc_noDB  <- result_lines_from_hpc_noDB  [result_lines_from_hpc_noDB $V8 == "INS", ]
+colnames(result_lines_from_hpc_noDB )[32] <- "case_reads"
+colnames(result_lines_from_hpc_noDB )[33] <- "controls_total_reads"
+colnames(result_lines_from_hpc_noDB )[9] <- "genes"
+colnames(result_lines_from_hpc_noDB  )[14] <- "VAF"
+
+gene_counts_lines_noDB <- result_lines_from_hpc_COSV  %>%
+  group_by(genes) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  top_n(20, count)
+
+
+#Filter for variants with over 1000 case reads and over 500 control_total_reads
+
+result_lines_from_hpc_noDB $controls_total_reads <- as.numeric(result_lines_from_hpc_noDB $controls_total_reads)
+
+filtered_result_lines_noDB <- result_lines_from_hpc_noDB  %>%
+  filter(case_reads > 1000, 
+         !is.na(controls_total_reads),
+         controls_total_reads > 500,
+         VAF >= 0.1)
+
+
+gene_counts_lines_from_hpc_filtered_noDB <- filtered_result_lines_noDB%>%
+  group_by(genes) %>%
+  summarise(count = n(), 
+            avg_vaf = mean(VAF), 
+            avg_case_reads = mean(case_reads),
+            avg_controls_total_reads = mean(controls_total_reads)) %>%
+  arrange(desc(count)) %>%
+  top_n(20, count)
+
+#Create new df based on results for Levenshtein filtering 
+NoDB_filtered_for_levenscore <- inner_join(df_split, filtered_result_lines_noDB, 
+                                           by = c("file_name" = "V1", "V3" = "V11"))
+
+
+```
+
+
+```{r}
+#Import result file for insertions with COS data base entries 
+library(dplyr)
+
+result_lines_from_hpc <- read.csv("/home/briana/shared/resultlinesfromhpc.txt", header = FALSE, sep = "", na.strings = "NA")
+result_lines_from_hpc <- result_lines_from_hpc[result_lines_from_hpc$V8 == "INS", ]
+colnames(result_lines_from_hpc)[32] <- "case_reads"
+colnames(result_lines_from_hpc)[33] <- "controls_total_reads"
+colnames(result_lines_from_hpc)[9] <- "genes"
+colnames(result_lines_from_hpc)[14] <- "VAF"
+
+
+gene_counts_lines_from_hpc <- result_lines_from_hpc %>%
+  group_by(genes) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  top_n(20, count)
+
+
+#Filter for variants with over 1000 case reads and over 500 control_total_reads
+
+result_lines_from_hpc$controls_total_reads <- as.numeric(result_lines_from_hpc$controls_total_reads)
+
+filtered_result_lines <- result_lines_from_hpc %>%
+  filter(case_reads > 100, 
+         !is.na(controls_total_reads),
+         controls_total_reads > 25)
+
+gene_counts_lines_from_hpc_filtered <- filtered_result_lines %>%
+  group_by(genes) %>%
+  summarise(count = n(), 
+            avg_vaf = mean(VAF), 
+            avg_case_reads = mean(case_reads),
+            avg_controls_total_reads = mean(controls_total_reads)) %>%
+  arrange(desc(count)) %>%
+  top_n(20, count)
+
+
+#Create new df based on results for Levenshtein filtering 
+
+COSV_filtered_for_levenscore <- inner_join(df_split, filtered_result_lines_COSV, 
+                                           by = c("file_name" = "V1", "V3" = "V11"))
+
+
+
+
+```
+
+
+```{r}
+#Levenshtein score for insertions that meet VAF and control count values - no DB entries
+#This block determines the Levenshtein score for the data frame for each variant, when comparing the variant to the left and right sequence at the insertion point. 
+
+# Determine the length of the alt sequence
+NoDB_filtered_for_levenscore$alt_length <- nchar(NoDB_filtered_for_levenscore $V5.x)
+
+# Skip variants where the alt sequence is too short (not interested in insertions less than 3 bases)
+alt_length_threshold <- 3
+NoDB_filtered_for_levenscore <- subset(NoDB_filtered_for_levenscore , NoDB_filtered_for_levenscore  $alt_length >= alt_length_threshold)
+
+# Convert the chromosome name to the RefSeq accession number
+chrom_to_accession <- list(chr1 = "NC_000001.11", chr2 = "NC_000002.12", chr3 = "NC_000003.12", chr4 = "NC_000004.12", chr5 = "NC_000005.10", chr6= "NC_000006.12", chr7 = "NC_000007.14", chr8= "NC_000008.11", chr9= "NC_000009.12", chr10 = "NC_000010.11", chr11 = "NC_000011.10", chr12 = "NC_000012.12", chr13 = "NC_000013.11", chr14 = "NC_000014.9", chr15 = "NC_000015.10", chr16 = "NC_000016.10", chr17 = "NC_000017.11", chr18 = "NC_000018.10", chr19 = "NC_000019.10", chr20 = "NC_000020.11", chr21 = "NC_000021.9", chr22 = "NC_000022.11", chrX = "NC_000023.11",chrY = "NC_000024.10") 
+
+
+NoDB_filtered_for_levenscore  <- NoDB_filtered_for_levenscore [NoDB_filtered_for_levenscore $V1 %in% names(chrom_to_accession), ]
+NoDB_filtered_for_levenscore  $accession <- chrom_to_accession[match(NoDB_filtered_for_levenscore $V1, names(chrom_to_accession))]
+
+# Define the start and end positions for the reference sequence
+NoDB_filtered_for_levenscore  $start <- as.integer(NoDB_filtered_for_levenscore $V2.x) - 1
+NoDB_filtered_for_levenscore $end <- NoDB_filtered_for_levenscore  $start + NoDB_filtered_for_levenscore  $alt_length
+
+# Use system() to retrieve the reference sequences
+ref_fasta_path <- "/home/briana/shared/AdjacentSequence/ncbi-genomes-2023-04-08/GCF_000001405.40_GRCh38.p14_genomic.fna"
+NoDB_filtered_for_levenscore $ref_fasta_cmd_right <- paste0("samtools faidx ", ref_fasta_path, " ", NoDB_filtered_for_levenscore  $accession, ":", NoDB_filtered_for_levenscore  $start+1, "-", NoDB_filtered_for_levenscore  $end)
+NoDB_filtered_for_levenscore  $ref_seq_right <- sapply(NoDB_filtered_for_levenscore  $ref_fasta_cmd_right, function(cmd) system(cmd, intern = TRUE)[2])
+NoDB_filtered_for_levenscore $ref_fasta_cmd_left <- paste0("samtools faidx ", ref_fasta_path, " ", NoDB_filtered_for_levenscore  $accession, ":", NoDB_filtered_for_levenscore  $start-NoDB_filtered_for_levenscore  $alt_length, "-", NoDB_filtered_for_levenscore  $start-1)
+NoDB_filtered_for_levenscore $ref_seq_left <- sapply(NoDB_filtered_for_levenscore  $ref_fasta_cmd_left, function(cmd) system(cmd, intern = TRUE)[2])
+
+# Compare the alt and reference sequences using Levenshtein distance
+library(stringdist)
+NoDB_filtered_for_levenscore$lev_distance_right <- stringdist(NoDB_filtered_for_levenscore $ref_seq_right, NoDB_filtered_for_levenscore  $V5.x, method = "lv", nthread = 4)
+NoDB_filtered_for_levenscore  $lev_distance_left <- stringdist(NoDB_filtered_for_levenscore  $ref_seq_left, NoDB_filtered_for_levenscore  $V5.x, method = "lv", nthread = 4)
+
+
+# Append the new information as a new column to the variant line
+NoDB_filtered_for_levenscore$new_info_right <- ifelse(NoDB_filtered_for_levenscore $lev_distance_right != -1, paste0("Levenshtein=", NoDB_filtered_for_levenscore $lev_distance_right, "| Original sequence(right)=", NoDB_filtered_for_levenscore $ref_seq_right, ", Variant sequence=", NoDB_filtered_for_levenscore $V5), paste0("Levenshtein=", NoDB_filtered_for_levenscore$lev_distance_right, "|"))
+NoDB_filtered_for_levenscore $new_info_left <- ifelse(NoDB_filtered_for_levenscore $lev_distance_left != -1, paste0("Levenshtein=", NoDB_filtered_for_levenscore $lev_distance_left, "| Original sequence(left)=", NoDB_filtered_for_levenscore$ref_seq_left, ", Variant sequence=", NoDB_filtered_for_levenscore $V5), paste0("Levenshtein=", NoDB_filtered_for_levenscore $lev_distance_left, "|"))
+
+#This block calculates a ratio of the score over the length of the variant to account for an increased number of of changes in longer #variants, and adds this information to the data frame.
+
+# Add scaled Levenshtein distances to COSV
+NoDB_filtered_for_levenscore $lev_distance_right_scaled <- NoDB_filtered_for_levenscore $lev_distance_right / nchar(NoDB_filtered_for_levenscore$V5.x)
+NoDB_filtered_for_levenscore $lev_distance_left_scaled <- NoDB_filtered_for_levenscore$lev_distance_left / nchar(NoDB_filtered_for_levenscore$V5.x)
+
+
+
+```
+
+
+```{r}
+
+#Join the DBs back togetherfor no DB entry
+library(dplyr)
+
+filtered_result_lines_noDB$lev_distance_right_scaled <- NoDB_filtered_for_levenscore$lev_distance_right_scaled
+filtered_result_lines_noDB$lev_distance_left_scaled <- NoDB_filtered_for_levenscore$lev_distance_left_scaled
+
+noDB_filtered_results_final <- filtered_result_lines_noDB %>%
+                                 select(V1,V2,V3, genes, VAF, case_reads, controls_total_reads,
+                                        lev_distance_right_scaled, lev_distance_left_scaled)
+
+
+colnames(noDB_filtered_results_final)[1] <- "file_name"
+colnames(noDB_filtered_results_final)[2] <- "chromosome"
+colnames(noDB_filtered_results_final)[3] <- "chrom_position"
+```
+
+
+
+```{r}
+#Levenshtein score for insertions that meet VAF and control count values for COSV values
+#This block determines the Levenshtein score for the data frame for each variant, when comparing the variant to the left and right sequence at the insertion point. 
+
+# Determine the length of the alt sequence
+COSV_filtered_for_levenscore $alt_length <- nchar(COSV_filtered_for_levenscore$V5.x)
+
+# Skip variants where the alt sequence is too short (not interested in insertions less than 3 bases)
+alt_length_threshold <- 3
+COSV_filtered_for_levenscore <- subset(COSV_filtered_for_levenscore , COSV_filtered_for_levenscore $alt_length >= alt_length_threshold)
+
+# Convert the chromosome name to the RefSeq accession number
+chrom_to_accession <- list(chr1 = "NC_000001.11", chr2 = "NC_000002.12", chr3 = "NC_000003.12", chr4 = "NC_000004.12", chr5 = "NC_000005.10", chr6= "NC_000006.12", chr7 = "NC_000007.14", chr8= "NC_000008.11", chr9= "NC_000009.12", chr10 = "NC_000010.11", chr11 = "NC_000011.10", chr12 = "NC_000012.12", chr13 = "NC_000013.11", chr14 = "NC_000014.9", chr15 = "NC_000015.10", chr16 = "NC_000016.10", chr17 = "NC_000017.11", chr18 = "NC_000018.10", chr19 = "NC_000019.10", chr20 = "NC_000020.11", chr21 = "NC_000021.9", chr22 = "NC_000022.11", chrX = "NC_000023.11",chrY = "NC_000024.10") 
+
+
+COSV_filtered_for_levenscore  <- COSV_filtered_for_levenscore [COSV_filtered_for_levenscore $V1 %in% names(chrom_to_accession), ]
+COSV_filtered_for_levenscore $accession <- chrom_to_accession[match(COSV_filtered_for_levenscore$V1, names(chrom_to_accession))]
+
+# Define the start and end positions for the reference sequence
+COSV_filtered_for_levenscore $start <- as.integer(COSV_filtered_for_levenscore $V2.x) - 1
+COSV_filtered_for_levenscore $end <- COSV_filtered_for_levenscore $start + COSV_filtered_for_levenscore $alt_length
+
+# Use system() to retrieve the reference sequences
+ref_fasta_path <- "/home/briana/shared/AdjacentSequence/ncbi-genomes-2023-04-08/GCF_000001405.40_GRCh38.p14_genomic.fna"
+COSV_filtered_for_levenscore $ref_fasta_cmd_right <- paste0("samtools faidx ", ref_fasta_path, " ", COSV_filtered_for_levenscore $accession, ":", COSV_filtered_for_levenscore $start+1, "-", COSV_filtered_for_levenscore $end)
+COSV_filtered_for_levenscore $ref_seq_right <- sapply(COSV_filtered_for_levenscore $ref_fasta_cmd_right, function(cmd) system(cmd, intern = TRUE)[2])
+COSV_filtered_for_levenscore $ref_fasta_cmd_left <- paste0("samtools faidx ", ref_fasta_path, " ", COSV_filtered_for_levenscore $accession, ":", COSV_filtered_for_levenscore $start-COSV_filtered_for_levenscore $alt_length, "-", COSV_filtered_for_levenscore $start-1)
+COSV_filtered_for_levenscore $ref_seq_left <- sapply(COSV_filtered_for_levenscore $ref_fasta_cmd_left, function(cmd) system(cmd, intern = TRUE)[2])
+
+# Compare the alt and reference sequences using Levenshtein distance
+library(stringdist)
+COSV_filtered_for_levenscore$lev_distance_right <- stringdist(COSV_filtered_for_levenscore$ref_seq_right, COSV_filtered_for_levenscore $V5.x, method = "lv", nthread = 4)
+COSV_filtered_for_levenscore $lev_distance_left <- stringdist(COSV_filtered_for_levenscore $ref_seq_left, COSV_filtered_for_levenscore $V5.x, method = "lv", nthread = 4)
+
+
+# Append the new information as a new column to the variant line
+COSV_filtered_for_levenscore $new_info_right <- ifelse(COSV_filtered_for_levenscore $lev_distance_right != -1, paste0("Levenshtein=", COSV_filtered_for_levenscore $lev_distance_right, "| Original sequence(right)=", COSV_filtered_for_levenscore $ref_seq_right, ", Variant sequence=", COSV_filtered_for_levenscore $V5), paste0("Levenshtein=", COSV_filtered_for_levenscore $lev_distance_right, "|"))
+COSV_filtered_for_levenscore $new_info_left <- ifelse(COSV_filtered_for_levenscore $lev_distance_left != -1, paste0("Levenshtein=", COSV_filtered_for_levenscore $lev_distance_left, "| Original sequence(left)=", COSV_filtered_for_levenscore $ref_seq_left, ", Variant sequence=", COSV_filtered_for_levenscore $V5), paste0("Levenshtein=", COSV_filtered_for_levenscore$lev_distance_left, "|"))
+
+#This block calculates a ratio of the score over the length of the variant to account for an increased number of of changes in longer #variants, and adds this information to the data frame.
+
+# Add scaled Levenshtein distances to COSV
+COSV_filtered_for_levenscore$lev_distance_right_scaled <- COSV_filtered_for_levenscore$lev_distance_right / nchar(COSV_filtered_for_levenscore$V5.x)
+COSV_filtered_for_levenscore$lev_distance_left_scaled <- COSV_filtered_for_levenscore$lev_distance_left / nchar(COSV_filtered_for_levenscore$V5.x)
+
+library(dplyr)
+
+joined_data_COSV <- left_join(filtered_result_lines_COSV, COSV_filtered_for_levenscore, 
+                         by = c("V1" = "file_name"))
+
+joined_data_COSV <- select(joined_data_COSV, -c(case_reads.y, controls_total_reads.y, V3.x)) %>%
+               rename(case_reads = case_reads.x, controls_total_reads = controls_total_reads.x)
+
+
+
+COSV_filtered_results <- select(joined_data_COSV, V1, V2,V6, genes.x, VAF.x, case_reads, 
+                         controls_total_reads, lev_distance_right_scaled, 
+                         lev_distance_left_scaled)
+
+
+colnames(COSV_filtered_results)[1] <- "file_name"
+colnames(COSV_filtered_results)[2] <- "chromosome"
+colnames(COSV_filtered_results)[3] <- "chrom_position"
+```
+
+
+
 #The following blocks are for data visualisation and table generation
 
 
 ```{r}
 #Generate VAF plot for genes in COSMIC census 
-
-
-# Load the ggplot2 package
 # Load the ggplot2 package
 library(ggplot2)
 
@@ -435,16 +782,68 @@ VAFforCOSMICCensus <- ggplot(COSV_genes_only_df, aes(x = V2, y = VAF)) +  # swap
 filepath <- "/home/briana/shared/VAFDistribution.png"
 ggsave(filepath, width = 20, height = 10, dpi = 300)
 
+```
 
 
+```{r}
+#Generate VAF plot for genes not in COSMIC census 
+# Load the ggplot2 package
+library(ggplot2)
+
+filtered_VAF_noCOSMIC_values$V2 <- factor(filtered_VAF_noCOSMIC_values$V2)
+
+# Create the facet-wrapped box plots
+VAFfornoCOSMICCensus <- ggplot(filtered_VAF_noCOSMIC_values, aes(x = V2, y = VAF)) +  # swapped x and y
+  geom_boxplot() +
+  labs(x = "Genes", y = "VAF") +  # updated x and y labels
+  ggtitle("Estimated VAF scores for TCGA TARGET AML cohort genes with no associated database entry") +
+  theme_bw() +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1, size = 20), plot.title = element_text(size = 30), axis.text.x = element_text(size = 20), axis.title.x = element_text(size = 30), axis.title.y = element_text(size = 30))
+
+# Save plot to file
+filepath <- "/home/briana/shared/noCOSVAFDistribution.png"
+ggsave(filepath, width = 20, height = 10, dpi = 300)
+
+```
+
+```{r}
+#Bar plot for high and moderate genes with no associated database entry 
+library(ggplot2)
+
+# Subset data to include only variants with no DB entry
+df_split_noDBENTRY <- subset(df_split, (`ExistingVariant` == "") & (`col3` == "HIGH" | `col3` == "MODERATE"))
+
+# Aggregate data by gene and variant and count the number of occurrences
+gene_counts <- aggregate(`ExistingVariant` ~ col4, data = df_split_noDBENTRY, FUN = function(x) length(x))
+
+# Order the genes by count of variants
+gene_counts_sorted <- gene_counts[order(gene_counts$`ExistingVariant`, decreasing = TRUE), ]
+
+# Keep only the top 20 col4 values
+top_20_gene_counts <- head(gene_counts_sorted, 20)
 
 
+# Create bar plot
+highmodnodb <- ggplot(top_20_gene_counts, aes(x = reorder(col4, `ExistingVariant`), y = `ExistingVariant`, fill = `ExistingVariant`)) +
+  geom_bar(stat = "identity") +
+  labs(fill = "Consequence\n by Count",x = "Gene", y = "HIGH and MODERATE Consequence count") +  theme_light() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size =20),axis.title.x = element_text(size = 20),
+        plot.title = element_text(hjust = 0.5, size = 20)) + 
+  ggtitle("VEP determined HIGH or MODERATE consequence MINTIE insertions with\n no associated database entry in TCGA TARGET AML cohort")
+
+filepath <- "/home/briana/shared/HIGHMODnoDBENTRY.png" 
+png(filepath, width = 1300, height = 1100)
+plot(highmodnodb)
+dev.off()
 
 
 ```
 
 
+
 ```{r HIGH or MODERATE con}
+
+#Bar plot for genes with high mod in COSMIC
 
 library(ggplot2)
 
@@ -506,23 +905,27 @@ dev.off()
 
 
 ```{r Insertion length distribution}
+library(ggplot2) 
+library(ggthemes)
 
 distribution_plot <- ggplot(df_split, aes(x = SVLEN)) +
-  geom_histogram(alpha = 0.5, fill = "lightgreen", color = "darkgreen", binwidth = 20, bins = 20) +
-  labs(y = "Count", x = "Insertion length (bp)",title = "Length distribution of MINTIE insertions\n in TCGA TARGET AML Cohort") +
+  geom_histogram(alpha = 0.5, fill = "lightgreen", color = "darkgreen", binwidth = .02, bins = 50) +
+  labs(y = "Count (log10)", x = "Insertion length (bp (log10)) ",title = "Length distribution of VEP determined High and Moderate MINTIE insertions in TCGA TARGET AML Cohort") +
   theme_light() +
-  scale_y_log10() +
+  scale_x_log10(limits = c(10, 1000)) +
   guides(x = guide_axis(angle = 90))
 
 modifieddistplot <- distribution_plot + 
   theme(plot.title = element_text(size = 20,hjust = 0.5), 
         axis.title.x = element_text(size = 15),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size=12),
         axis.title.y = element_text(size = 15), 
         legend.position = "bottom"
         )
 
 
-filepath <- "/Users/Briana/Desktop/Uni/Briana Project Stuff/getVEPRunning/ProcessedVEPInsertions/FilesforRprocessing/ProcessingVEPOutput/Graphics/InsertionLengthDistribution.png" 
+filepath <- "/home/briana/shared/InsertionLengthDistribution_TCGA_TARGET_AML.png" 
 png(filepath, width = 1300, height = 1100)
 plot(modifieddistplot)
 dev.off()
@@ -531,6 +934,34 @@ dev.off()
 ```
 
 
+```{r}
+#COSMIC Insertion length distribution
+
+library(ggplot2) 
+library(ggthemes)
+
+distribution_plot <- ggplot(df_filtered_COS, aes(x = SVLEN)) +
+  geom_histogram(alpha = 0.5, fill = "lightgreen", color = "darkgreen", binwidth = .05, bins = 10) +
+  labs(y = "Count (log10)", x = "Insertion length (bp (log10)) ",title = "Length distribution of COSMIC associated MINTIE insertions in TCGA TARGET AML Cohort") +
+  theme_light() +
+  scale_x_log10(limits = c(10, 1000)) +
+  guides(x = guide_axis(angle = 90))
+
+modifieddistplot <- distribution_plot + 
+  theme(plot.title = element_text(size = 20,hjust = 0.5), 
+        axis.title.x = element_text(size = 15),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size=12),
+        axis.title.y = element_text(size = 15), 
+        legend.position = "bottom"
+        )
+
+
+filepath <- "/home/briana/shared/COSMIC_InsertionLengthDistribution_TCGA_TARGET_AML_HIGH_MOD_NO_RS.png" 
+png(filepath, width = 1300, height = 1100)
+plot(modifieddistplot)
+dev.off()
+```
 
 
 ```{r fig.height = 10, fig.width = 5}
@@ -841,6 +1272,7 @@ dev.off()
 
 
 ```
+
 ```{r}
 library(dplyr)
 
@@ -1002,4 +1434,168 @@ dev.off()
 
 
 ```
+
+```{r}
+library(gridExtra)
+library(grid)
+
+#Generate PDF with summarized information for new information
+
+#Generate highest histology count from results_df_summary_split
+
+# Create the PDF and add the title
+pdf("/home/briana/shared/exploratory_insertions.pdf", height=20, width=38)
+
+grid.text(paste("Result of filtering on insertion variants with associated COSV entry. Selected variants had >100 case_reads and >25 controls_total_reads. \n ****I used the Levenshtein score because I couldn't find any ITD detectors that would be straight forward in R - for example, some required out-put from other variant callers, I might need to have a closer look, happy to discuss ideas at meeting though***"), x=0.5, y=0.95, gp=gpar(fontsize=20))
+grid.table(COSV_filtered_results)
+
+# Define the number of rows per page
+rows_per_page <- 30
+
+# Get the total number of rows in the data frame
+total_rows <- nrow(noDB_filtered_results_final)
+
+# Calculate the number of pages required to display all rows
+num_pages <- ceiling(total_rows / rows_per_page)
+
+# Loop through each page
+for (i in 1:num_pages) {
+  # Subset the data frame to the appropriate rows for this page
+  start_row <- (i - 1) * rows_per_page + 1
+  end_row <- min(start_row + rows_per_page - 1, total_rows)
+  page_df <- noDB_filtered_results_final[start_row:end_row, ]
+  
+  # Create a table grob for the page
+  table_grob <- tableGrob(page_df)
+  
+  # Draw the table on a new PDF page
+  grid.newpage()
+  grid.text(paste("With the same filtering applied to the COSV linked variants, there are around 800 non-database linked high and moderate variants. With stricter filtering >1000 case reads and >500 controls_total_reads and VAF >0.1 get 83.\n***Not 100% sure if I used the correct things to filter off the result file, but I can easily change the thresholds and include any other filtering based on the result file*** Page: ", i), x=0.5, y=0.95, gp=gpar(fontsize=20))
+  grid.draw(table_grob)
+}
+
+
+
+```
+
+
+```{r}
+library(dbplyr)
+
+#Get numbers of rows 
+
+totalINS <- nrow(df_split)
+
+mask <- !grepl("(regulatory_region|TF_binding_site|intergenic_variant|upstream_gene_variant|5_prime_UTR_variant|start_retained_variant|start_lost|splice_donor_variant|splice_acceptor_variant|splice_region_variant|splice_donar_variant_5th_base_variant|splice_donor_region _variant|splice_polypyrimidine_tract_variant|intron_variant|3_prime_UTR_variant|downstream_gene_variant).*", df_split$col2)
+
+df_filtered_INSCODING <- df_split[mask, ]
+
+n_rows_coding_regions_INS <- nrow(df_filtered_INSCODING)
+
+# create a boolean mask
+mask <- !(grepl("(regulatory region|TF binding site|intergenic variant|upstream gene variant|5 prime UTR variant|start retained variant|start lost|splice donor variant|splice acceptor variant|splice region variant|splice donar variant 5th base variant|splice donor region variant|splice polypyrimidine tract variant|intron variant|3 prime UTR variant|downstream gene variant).*", df_split$col2) | df_split$col3 == "LOW" | df_split$col3 == "MODIFIER")
+
+# filter the dataframe
+df_filtered_HIGH_MOD <- df_filtered_INSCODING[mask, ]
+
+# count the number of rows
+n_rows_coding_regions_INS_HIGH_MOD <- nrow(df_filtered_HIGH_MOD)
+
+mask <- !(grepl("(regulatory region|TF binding site|intergenic variant|upstream gene variant|5 prime UTR variant|start retained variant|start lost|splice donor variant|splice acceptor variant|splice region variant|splice donar variant 5th base variant|splice donor region variant|splice polypyrimidine tract variant|intron variant|3 prime UTR variant|downstream gene variant).*", df_split$col2) | df_split$col3 == "LOW" | df_split$col3 == "MODIFIER" | !grepl("COSV", df_split$col18) | !grepl("rs", df_split$col18))
+
+
+# filter the dataframe
+df_filtered_COS_DBSNP <- df_split[mask, ]
+
+# count the number of rows
+n_rows_COSV_DBSNP_HIGH_MOD <- nrow(df_filtered)
+
+mask <- !(grepl("(regulatory region|TF binding site|intergenic variant|upstream gene variant|5 prime UTR variant|start retained variant|start lost|splice donor variant|splice acceptor variant|splice region variant|splice donar variant 5th base variant|splice donor region variant|splice polypyrimidine tract variant|intron variant|3 prime UTR variant|downstream gene variant).*", df_split$col2) | df_split$col3 == "LOW" | df_split$col3 == "MODIFIER" | grepl("COSV", df_split$col18) | !grepl("rs", df_split$col18))
+
+
+# filter the dataframe
+df_filtered_noCOS <- df_split[mask, ]
+
+# count the number of rows
+n_rows_NOCOSV_DBSNP_HIGH_MOD <- nrow(df_filtered_noCOS)
+
+df_filtered_COS <- subset(df_split, col3 != "LOW" & col3 != "MODIFIER" & grepl("COSV", col18) & !grepl("rs", col18))
+
+# count the number of rows
+n_rows_COSV_NODBSNP_HIGH_MOD <- nrow(df_filtered_COS )
+
+
+mask <- grepl("COSV",df_split$col18)
+
+# filter the dataframe
+df_filtered_ALL_COS <- df_split[mask, ]
+
+# count the number of rows
+n_rows_ALL_COS <- nrow(df_filtered_ALL_COS)
+
+
+
+```
+
+
+```{r}
+
+#COSMIC Insertion length distribution
+
+library(ggplot2) 
+library(ggthemes)
+
+distribution_plot <- ggplot(df_filtered_COS, aes(x = SVLEN)) +
+  geom_histogram(alpha = 0.5, fill = "lightgreen", color = "darkgreen", binwidth = .2, bins = 5) +
+  labs(y = "Count (log10)", x = "Insertion length (bp (log10)) ",title = "Length distribution of 'HIGH' and 'MODERATE' impact COSMIC associated MINTIE insertions in TCGA TARGET AML Cohort") +
+  theme_light() +
+  scale_x_log10(limits = c(10, 1000)) +
+  guides(x = guide_axis(angle = 90))
+
+modifieddistplot <- distribution_plot + 
+  theme(plot.title = element_text(size = 20,hjust = 0.5), 
+        axis.title.x = element_text(size = 15),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size=12),
+        axis.title.y = element_text(size = 15), 
+        legend.position = "bottom"
+        )
+
+
+filepath <- "/home/briana/shared/COSMIC_InsertionLengthDistribution_TCGA_TARGET_AML_HIGH_MOD_NO_RS.png" 
+png(filepath, width = 1300, height = 1100)
+plot(modifieddistplot)
+dev.off()
+```
+```{r}
+
+
+#COSMIC Insertion length distribution
+
+library(ggplot2) 
+library(ggthemes)
+
+distribution_plot <- ggplot(df_filtered_ALL_COS, aes(x = SVLEN)) +
+  geom_histogram(alpha = 0.5, fill = "lightgreen", color = "darkgreen", binwidth = .07, bins = 15) +
+  labs(y = "Count (log10)", x = "Insertion length (bp (log10)) ",title = "Length distribution of COSMIC associated MINTIE insertions in TCGA TARGET AML Cohort") +
+  theme_light() +
+  scale_x_log10(limits = c(10, 1000)) +
+  guides(x = guide_axis(angle = 90))
+
+modifieddistplot <- distribution_plot + 
+  theme(plot.title = element_text(size = 20,hjust = 0.5), 
+        axis.title.x = element_text(size = 15),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size=12),
+        axis.title.y = element_text(size = 15), 
+        legend.position = "bottom"
+        )
+
+
+filepath <- "/home/briana/shared/COSMIC_InsertionLengthDistribution_TCGA_TARGET_AML_ALL.png" 
+png(filepath, width = 1300, height = 1100)
+plot(modifieddistplot)
+dev.off()
+```
+
 

@@ -19,8 +19,8 @@ process Get_Insertions {
 	file("*") into output_data
 	
 	"""
-	chmod +x /stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/2_Get_INS_edit.sh 
-	/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/2_Get_INSDEL.sh  $input_files output/
+	chmod +x /stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/1_Get_INSDEL.sh 
+	/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/1_Get_INSDEL.sh  $input_files output/
 	"""
 
 } 

@@ -22,7 +22,7 @@ This command-line pipeline processes a .vcf file containing variants identified 
 - Install Nextflow: https://www.nextflow.io/docs/latest/getstarted.html
 - Install R: https://cloud.r-project.org/ (R environment variables still need to be added to the nextflow.config so they are not harded coded into the Nextflow script). 
 - Place your .vcf files in a chosen directory and set their location in `nextflow.config`.
-- Set the location for files containing VAF, control counts, and case counts in `6_GetResultFiles.sh`.
+- Set the location for files containing VAF, control counts, and case counts in `6_GetResultFiles.sh`. These files should end in .tsv. 
 - Run `Insertion_Pipeline.sh`.
 - Edit 1_Get_INSDEL.sh for deletions (this will be improved in future).
 - Test files to be added. 

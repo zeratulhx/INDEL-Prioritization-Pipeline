@@ -35,5 +35,5 @@ This command-line pipeline processes a .vcf file containing variants identified 
 
 *****Warning******
 
-Pipeline is in a draft stage. 
+Pipeline is in a draft stage.  
 

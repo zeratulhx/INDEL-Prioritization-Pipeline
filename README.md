@@ -3,7 +3,7 @@
 ## What does this do?
 ###############################################################################
 
-This command-line pipeline processes a .vcf file containing variants identified by a variant caller (e.g., MINTIE) and prioritizes INDELs that are more likely to impact proteins.
+This command-line pipeline processes a .vcf file containing variants identified by a variant caller (e.g., MINTIE https://github.com/Oshlack/MINTIE) and prioritizes INDELs that are more likely to impact proteins.
 
 - The pipeline generates a list of known variants within the cohort (or sample) that are causally associated with cancer, based on The Cancer Gene Census (CGC) (https://cancer.sanger.ac.uk/census).
 - The pipeline also creates a prioritized list of coding region variants not found in COSMIC or dbSNP, potentially identifying novel variants.

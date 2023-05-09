@@ -20,7 +20,7 @@ This command-line pipeline processes a .vcf file containing variants identified 
 - Install SQLite: https://sqlite.org/index.html
 - Download `CosmicMutantExportCensus.tsv.gz` from https://cancer.sanger.ac.uk/cosmic/download (this file needs to be indexed based on the COSV identifier and renamed to `a_census_db.db` with a table called `a_census_table`. A script for this will be added in the future.)
 - Install Nextflow: https://www.nextflow.io/docs/latest/getstarted.html
-- Install R: https://cloud.r-project.org/
+- Install R: https://cloud.r-project.org/ (R environment variables needs to be added to the nextflow.config so they are not harded coded into the Nextflow script). 
 - Place your .vcf files in a chosen directory and set their location in `nextflow.config`.
 - Set the location for files containing VAF, control counts, and case counts in `6_GetResultFiles.sh`.
 - Run `Insertion_Pipeline.sh`.

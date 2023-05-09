@@ -1,6 +1,6 @@
 #!/bin/bash
 
-src_dir="/vast/projects/lab_davidson/data/TCGA-OV/MINTIE"
+src_dir="set/your/directory"
 dst_dir=${PWD}
 
 while read line; do

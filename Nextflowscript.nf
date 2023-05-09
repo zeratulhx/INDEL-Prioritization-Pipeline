@@ -4,7 +4,7 @@
 input_vcf = Channel.fromPath(params.input_data)
 
 
-//Process 1: This takes the .vcf and extracts the insertions 
+//Process 1: This takes the .vcf and extracts the insertions deletions
 
 process Get_Insertions {
 	tag "Step 1: Processing file: ${input_files}"
@@ -19,12 +19,12 @@ process Get_Insertions {
 	file("*") into output_data
 	
 	"""
-	chmod +x /stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/1_Get_INSDEL.sh 
-	/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/1_Get_INSDEL.sh  $input_files output/
+	chmod +x set/your/directory/1_Get_INSDEL.sh 
+	set/your/directory/1_Get_INSDEL.sh  $input_files output/
 	"""
 
 } 
-//Process 2: This takes the insertions and runs VEP
+//Process 2: This takes the insertions and runs VEP. 
 process Run_VEP_Analysis {
 	tag "Step 2: Modifying file: ${MINTIE_Insertion_file}"
 	
@@ -42,7 +42,7 @@ process Run_VEP_Analysis {
 	
 	module load ensembl-vep/98.3
 	
-	vep --offline --cache --cache_version 109 --no_check_variants_order --dir_cache /stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD -i "${MINTIE_Insertion_file}" -o "${MINTIE_Insertion_file.baseName}_output.txt" --force_overwrite --vcf --sift b --uniprot --check_existing --pubmed 
+	vep --offline --cache --cache_version 109 --no_check_variants_order --dir_cache set/your/directory -i "${MINTIE_Insertion_file}" -o "${MINTIE_Insertion_file.baseName}_output.txt" --force_overwrite --vcf --sift b --uniprot --check_existing --pubmed 
 	
 	if [ -e "*warnings.txt" ]; then
 		rm *warnings.txt
@@ -61,7 +61,7 @@ process Run_VEP_Analysis {
 grouped_modified_data = modified_data.collect()
 
 
-//Process 3: This runs R analysis for variants with a database entry
+//Process 3: This runs R analysis for variants and also sets the R environment (these are hard coded and need to be changed). 
 
 process Run_R_Analysis {
 	tag "Step 3: Analyzing data in R"
@@ -81,11 +81,11 @@ process Run_R_Analysis {
 	}
 		
 	"""
-	export R_ENVIRON_USER='/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/'
-	chmod +x /stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/2_RScript.sh
-	export R_LIBS_USER='/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/renv/library/R-4.2/x86_64-pc-linux-gnu'
-	export RENV_PATHS_CACHE='/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD'
-	/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/2_RScript.sh {VEP_Files}	
+	export R_ENVIRON_USER='set/your/directory'
+	chmod +x set/your/directory/2_RScript.sh
+	export R_LIBS_USER='set/your/directory/renv/library/R-4.2/x86_64-pc-linux-gnu'
+	export RENV_PATHS_CACHE='set/your/directory'
+	set/your/directory2_RScript.sh {VEP_Files}	
 	
 	"""
 

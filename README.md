@@ -24,6 +24,7 @@ This command-line pipeline processes a .vcf file containing variants identified 
 - Place your .vcf files in a chosen directory and set their location in `nextflow.config`.
 - Set the location for files containing VAF, control counts, and case counts in `6_GetResultFiles.sh`.
 - Run `Insertion_Pipeline.sh`.
+- Edit 1_Get_INSDEL.sh for deletions (this will be improved in future).
 - Test files to be added. 
 
 ## How long will it take and what is the output?

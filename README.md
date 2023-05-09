@@ -12,7 +12,8 @@ This command-line pipeline processes a .vcf file containing variants identified 
 ## How do I run this?
 ################################################################################
 
-- The pipeline runs offline, requiring several large downloads (a download script will be added in the future).
+The pipeline runs offline, but requires several large files to do so.
+
 - Download all scripts and `renv.lock`.
 - Install Ensembl VEP: https://asia.ensembl.org/info/docs/tools/vep/script/vep_download.html
 - Download the VEP cache: https://asia.ensembl.org/info/docs/tools/vep/script/vep_cache.html#cache

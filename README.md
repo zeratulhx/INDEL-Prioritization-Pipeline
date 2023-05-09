@@ -1,6 +1,6 @@
 # INDEL Prioritization Pipeline
 
-## What does this pipeline do?
+## What does this do?
 ###############################################################################
 
 This command-line pipeline processes a .vcf file containing variants identified by a variant caller (e.g., MINTIE) and prioritizes INDELs that are more likely to impact proteins.
@@ -9,7 +9,7 @@ This command-line pipeline processes a .vcf file containing variants identified 
 - The pipeline also creates a prioritized list of coding region variants not found in COSMIC or dbSNP, potentially identifying novel variants.
 - The pipeline produces a list of cancers and associated variants linked to genes identified as containing a novel variant.
 
-## How do I run this pipeline?
+## How do I run this?
 ################################################################################
 
 - The pipeline runs offline, requiring several large downloads (a download script will be added in the future).
@@ -35,5 +35,5 @@ This command-line pipeline processes a .vcf file containing variants identified 
 
 *****Warning******
 
-Pipeline is in a very rough draft stage.  
+Pipeline is in a very rough draft stage. See issues.  
 

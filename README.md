@@ -33,5 +33,7 @@ This command-line pipeline processes a .vcf file containing variants identified 
 - The processing time is machine-dependent. In tests with no resource allocation, it took approximately 12 minutes to process 200 files. (Configuration options to be added).
 - The pipeline generates a `results_summary.pdf` file (additional output formats, such as command-line information or text files, will be added in the future).
 
+*****Warning******
 
+Pipeline is in a draft stage. 
 

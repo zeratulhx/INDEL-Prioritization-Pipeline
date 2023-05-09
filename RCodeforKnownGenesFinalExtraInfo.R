@@ -96,7 +96,7 @@ dbDisconnect(con)
 
 
 
-#This block searches through the COSV_df and connects it to information in the gene_info_census dataframe using nested lists. 
+#This block searches through the COSV_df and connects it to information in the gene_info_census dataframe. 
 ##########################################################################################################################
 
 merged_list<- list()

@@ -6,6 +6,8 @@ library(stringr)
 library(gridExtra)
 library(grid)
 
+#This block imports the data into a dataframe and splits merged information into separate columns.
+######################################################################################################
 
 files <- list.files(pattern = "\\.txt$", full.names = TRUE)
 
@@ -53,7 +55,7 @@ df_split <- df_split %>%
 #This block returns a data frame with information from COSMIC census database 
 #############################################################################################################################33
 
-current_file_path="/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD"
+current_file_path="set/your/directory/AutomatedITD"
 
 db_path <- file.path(current_file_path, "a_census_db.db")
 
@@ -267,7 +269,7 @@ write.table(contigs_filename_nodb, file = "filenamescontignodb.txt", sep = "\t",
 
 #Call script to get result files 
 
-result_file_script <- "/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/6_GetResultFiles.sh"
+result_file_script <- "set/your/directory/6_GetResultFiles.sh"
 
 exit_status1 <-system(result_file_script)
 
@@ -281,7 +283,7 @@ if (exit_status1 == 0){
 
 #Call script to create the result files
 
-generate_result_lines_script <- "/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/7_GetResultLines.sh"
+generate_result_lines_script <- "set/your/directory/7_GetResultLines.sh"
 
 exit_status2 <-system(generate_result_lines_script)
 

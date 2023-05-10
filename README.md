@@ -14,25 +14,25 @@ This command-line pipeline processes a .vcf file containing variants identified 
 
 The pipeline runs offline, but requires several large files to do so.
 
-- Download all scripts and `renv.lock`.
+- Download all scripts and `renv.lock`. Ensure everything is in the same directory. 
 - Install Ensembl VEP: https://asia.ensembl.org/info/docs/tools/vep/script/vep_download.html
 - Download the VEP cache: https://asia.ensembl.org/info/docs/tools/vep/script/vep_cache.html#cache
     (https://ftp.ensembl.org/pub/release-109/variation/indexed_vep_cache/) - Bio::DB::HTS required.
 - Install SQLite: https://sqlite.org/index.html
-- Download `CosmicMutantExportCensus.tsv.gz` from https://cancer.sanger.ac.uk/cosmic/download (this file needs to be indexed based on the COSV identifier and renamed to `a_census_db.db` with a table called `a_census_table`.  Without indexing the pipeline will be very slow. A script for this will be added in the future.)
+- Download `CosmicMutantExportCensus.tsv.gz` from https://cancer.sanger.ac.uk/cosmic/download (this file needs to be indexed based on the COSV identifier and renamed to `a_census_db.db` with a table called `a_census_table`.  Without indexing the pipeline will be very slow.)
 - Install Nextflow: https://www.nextflow.io/docs/latest/getstarted.html
-- Install R: https://cloud.r-project.org/ (R environment variables still need to be added to the nextflow.config so they are not harded coded into the Nextflow script). 
+- Install R: https://cloud.r-project.org/. 
 - Place your .vcf files in a chosen directory and set their location in `nextflow.config`.
 - Set the location for files containing VAF, control counts, and case counts in `6_GetResultFiles.sh`. These files should end in .tsv. 
 - Run `Insertion_Pipeline.sh`.
-- Edit 1_Get_INSDEL.sh for deletions (this will be improved in future).
+- Edit 1_Get_INSDEL.sh for deletions.
 - Test files to be added. 
 
 ## How long will it take and what is the output?
 ################################################################################
 
-- The processing time is machine-dependent. In tests with no resource allocation, it took approximately 12 minutes to process 200 files. (Configuration options to be added).
-- The pipeline generates a `results_summary.pdf` file (additional output formats, such as command-line information or text files, will be added in the future).
+- The processing time is machine-dependent. In tests with no resource allocation, it took approximately 12 minutes to process 200 files. 
+- The pipeline generates a `results_summary.pdf` file.
 
 *****Warning******
 

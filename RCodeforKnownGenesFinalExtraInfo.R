@@ -53,7 +53,7 @@ df_split <- df_split %>%
 #This block returns a data frame with information from COSMIC census database 
 #############################################################################################################################33
 
-current_file_path="/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD"
+current_file_path="yourpath/to/AutomatedITD"
 
 db_path <- file.path(current_file_path, "a_census_db.db")
 
@@ -267,7 +267,7 @@ write.table(contigs_filename_nodb, file = "filenamescontignodb.txt", sep = "\t",
 
 #Call script to get result files 
 
-result_file_script <- "/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/6_GetResultFiles.sh"
+result_file_script <- "yourpath/to/6_GetResultFiles.sh"
 
 exit_status1 <-system(result_file_script)
 
@@ -281,7 +281,7 @@ if (exit_status1 == 0){
 
 #Call script to create the result files
 
-generate_result_lines_script <- "/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/7_GetResultLines.sh"
+generate_result_lines_script <- "yourpath/to/7_GetResultLines.sh"
 
 exit_status2 <-system(generate_result_lines_script)
 
@@ -399,7 +399,7 @@ rows_per_page <- 30
 total_rows <- nrow(matching_Id_df)
 
 if (total_rows >0){
-
+write.csv(matching_Id_df,"samples_linked_to_variants.txt", row.names= FALSE)
 # Calculate the number of pages required to display all rows
 num_pages <- ceiling(total_rows / rows_per_page)
 
@@ -428,7 +428,7 @@ rows_per_page <- 30
 
 # Get the total number of rows in the data frame
 total_rows <- nrow(summary_noDB)
-
+write.csv(summary_noDB,"summary_noDB_text.txt", row.names= FALSE)
 if (total_rows > 0) {
 # Calculate the number of pages required to display all rows
 num_pages <- ceiling(total_rows / rows_per_page)
@@ -462,26 +462,7 @@ total_rows <- nrow(gene_info_df)
 
 if (total_rows > 0){
 
-# Calculate the number of pages required to display all rows
-num_pages <- ceiling(total_rows / rows_per_page)
-
-
-
-# Loop through each page
-for (i in 1:num_pages) {
-  # Subset the data frame to the appropriate rows for this page
-  start_row <- (i - 1) * rows_per_page + 1
-  end_row <- min(start_row + rows_per_page - 1, total_rows)
-  page_df <- gene_info_df[start_row:end_row, ]
-  
-  # Create a table grob for the page
-  table_grob <- tableGrob(page_df)
-  
-  # Draw the table on a new PDF page
-  grid.newpage()
-  grid.text(paste("Information for genes associated with a variant not in COSMIC, that contain other variants that are in COSMIC. Page ", i), x=0.5, y=0.95, gp=gpar(fontsize=20))
-  grid.draw(table_grob)
-}
+write.csv(gene_info_df, "gene_info_text.txt", row.names = FALSE)
 
 } else {
 	cat("The gene info data frame is empty or has incomplete data.")

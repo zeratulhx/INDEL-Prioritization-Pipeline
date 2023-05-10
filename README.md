@@ -31,7 +31,7 @@ The pipeline runs offline, but requires several large files to do so.
 ## How long will it take and what is the output?
 ################################################################################
 
-- The processing time is machine-dependent. In tests with no resource allocation, it took approximately 12 minutes to process 200 files. 
+- The processing time is machine-dependent and depends on the VAF, counts, control settings. In tests with no resource allocation, it takes approximately 12 minutes to process 200 files for >1000 cases, <1 controls and >.1 VAF. Stricter filtering will reduce run time (less database querying).  
 - The pipeline generates a `results_summary.pdf` file.
 
 *****Warning******

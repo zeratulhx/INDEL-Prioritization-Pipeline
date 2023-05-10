@@ -19,7 +19,7 @@ df_split$start <- as.integer(df_split$V2) - 1
 df_split$end <- df_split$start + df_split$alt_length
 
 # Use system() to retrieve the reference sequences
-ref_fasta_path <- "/home/briana/shared/AdjacentSequence/ncbi-genomes-2023-04-08/GCF_000001405.40_GRCh38.p14_genomic.fna"
+ref_fasta_path <- "path/to/fasta/indexed/reference/genome/GCF_000001405.40_GRCh38.p14_genomic.fna"
 df_split$ref_fasta_cmd_right <- paste0("samtools faidx ", ref_fasta_path, " ", df_split$accession, ":", df_split$start+1, "-", df_split$end)
 df_split$ref_seq_right <- sapply(df_split$ref_fasta_cmd_right, function(cmd) system(cmd, intern = TRUE)[2])
 df_split$ref_fasta_cmd_left <- paste0("samtools faidx ", ref_fasta_path, " ", df_split$accession, ":", df_split$start-df_split$alt_length, "-", df_split$start-1)

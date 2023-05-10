@@ -19,7 +19,7 @@ The pipeline runs offline, but requires several large files to do so.
 - Download the VEP cache: https://asia.ensembl.org/info/docs/tools/vep/script/vep_cache.html#cache
     (https://ftp.ensembl.org/pub/release-109/variation/indexed_vep_cache/) - Bio::DB::HTS required.
 - Install SQLite: https://sqlite.org/index.html
-- Download `CosmicMutantExportCensus.tsv.gz` from https://cancer.sanger.ac.uk/cosmic/download (this file needs to be indexed based on the COSV identifier and renamed to `a_census_db.db` with a table called `a_census_table`.  Without indexing the pipeline will be very slow.)
+- Download `CosmicMutantExportCensus.tsv.gz` from https://cancer.sanger.ac.uk/cosmic/download (this file needs to be indexed based on the COSV identifier and renamed to `a_census_db.db` with a table called `a_census_table`.  Without indexing the pipeline will be very slow).
 - Install Nextflow: https://www.nextflow.io/docs/latest/getstarted.html
 - Install R: https://cloud.r-project.org/. 
 - Place your .vcf files in a chosen directory and set their location in `nextflow.config`.

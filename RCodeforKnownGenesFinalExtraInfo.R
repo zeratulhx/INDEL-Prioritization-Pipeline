@@ -6,8 +6,6 @@ library(stringr)
 library(gridExtra)
 library(grid)
 
-#This block imports the data into a dataframe and splits merged information into separate columns.
-######################################################################################################
 
 files <- list.files(pattern = "\\.txt$", full.names = TRUE)
 
@@ -55,7 +53,7 @@ df_split <- df_split %>%
 #This block returns a data frame with information from COSMIC census database 
 #############################################################################################################################33
 
-current_file_path="set/your/directory/AutomatedITD"
+current_file_path="/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD"
 
 db_path <- file.path(current_file_path, "a_census_db.db")
 
@@ -96,7 +94,7 @@ dbDisconnect(con)
 
 
 
-#This block searches through the COSV_df and connects it to information in the gene_info_census dataframe. 
+#This block searches through the COSV_df and connects it to information in the gene_info_census dataframe using nested lists. 
 ##########################################################################################################################
 
 merged_list<- list()
@@ -269,7 +267,7 @@ write.table(contigs_filename_nodb, file = "filenamescontignodb.txt", sep = "\t",
 
 #Call script to get result files 
 
-result_file_script <- "set/your/directory/6_GetResultFiles.sh"
+result_file_script <- "/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/6_GetResultFiles.sh"
 
 exit_status1 <-system(result_file_script)
 
@@ -283,7 +281,7 @@ if (exit_status1 == 0){
 
 #Call script to create the result files
 
-generate_result_lines_script <- "set/your/directory/7_GetResultLines.sh"
+generate_result_lines_script <- "/stornext/Bioinf/data/lab_davidson/robson.b/Project/Pipeline/AutomatedITD/7_GetResultLines.sh"
 
 exit_status2 <-system(generate_result_lines_script)
 
@@ -315,12 +313,12 @@ gene_counts_lines_noDB <- result_lines_from_hpc_noDB  %>%
   top_n(20, count)
 
 
-#Filter for variants with over 100 case reads and less than 1 control_total_reads
+#Filter for variants with over 1000 case reads and less than 1 control_total_reads
 
 result_lines_from_hpc_noDB $controls_total_reads <- as.numeric(result_lines_from_hpc_noDB $controls_total_reads)
 
 filtered_result_lines_noDB <- result_lines_from_hpc_noDB  %>%
-  filter(case_reads > 100, 
+  filter(case_reads > 20, 
          !is.na(controls_total_reads),
          controls_total_reads < 1,
          VAF >= 0.1)
@@ -338,6 +336,7 @@ summary_noDB <- summary_noDB %>%
   rename_with(~ "variant_size",3)
 
 gene_list_noDB <- list(summary_noDB$genes)
+
 
 # Create a connection to SQLite database
 db_conn <- dbConnect(RSQLite::SQLite(), db_path)
@@ -374,6 +373,7 @@ gene_info_summary <- subset(gene_info_summary, !duplicated(gene_info_summary))
 gene_info_summary <- gene_info_summary[order(gene_info_summary$`Gene name`), ]
 
 
+
 #Save results of interest to PDF
 #########################################################################################################3
 
@@ -390,11 +390,15 @@ pdf(file = "results_summary.pdf", height = 20, width = 38)
 grid.text(paste("The highest histology by COSV id count is: ", max_primary_histology, " and the highest histology subtype by unique COSV id count is: ", max_subtype, ".\n All COSV identifiers included here are linked to mutations in genes listed in the Cancer Gene Census (http://cancer.sanger.ac.uk/census)\n 'The Cancer Gene Census (CGC) is an ongoing effort to catalogue those genes which contain mutations that have been causally implicated in cancer and explain how dysfunction of these genes drives cancer.\n The content, the structure, and the curation process of the Cancer Gene Census was described and published in Nature Reviews Cancer.'"), x=0.5, y=0.95, gp=gpar(fontsize=20))
 grid.table(results_df_gene_summary)
 
+
+
 # Define the number of rows per page
 rows_per_page <- 30
 
 # Get the total number of rows in the data frame
 total_rows <- nrow(matching_Id_df)
+
+if (total_rows >0){
 
 # Calculate the number of pages required to display all rows
 num_pages <- ceiling(total_rows / rows_per_page)
@@ -414,6 +418,10 @@ for (i in 1:num_pages) {
   grid.text(paste("Samples linked to variants in the Cancer Census database. Page ", i), x=0.5, y=0.95, gp=gpar(fontsize=20))
   grid.draw(table_grob)
 }
+} else {
+	cat("The number of matching IDs is empty")
+
+}
 
 # Define the number of rows per page
 rows_per_page <- 30
@@ -421,6 +429,7 @@ rows_per_page <- 30
 # Get the total number of rows in the data frame
 total_rows <- nrow(summary_noDB)
 
+if (total_rows > 0) {
 # Calculate the number of pages required to display all rows
 num_pages <- ceiling(total_rows / rows_per_page)
 
@@ -436,8 +445,13 @@ for (i in 1:num_pages) {
   
   # Draw the table on a new PDF page
   grid.newpage()
-  grid.text(paste("Variants with no associated database entry with VEP determined HIGH or MODERATE impact.\n Filtered on >100 case reads and <1 controls_total_reads. VAF >.1 Page: ", i), x=0.5, y=0.95, gp=gpar(fontsize=30))
+  grid.text(paste("Variants with no associated database entry with VEP determined HIGH or MODERATE impact.\n Filtered on >20 case reads and <1 controls_total_reads. VAF >.1 Page: ", i), x=0.5, y=0.95, gp=gpar(fontsize=30))
   grid.draw(table_grob)
+}
+
+} else {
+	cat("No samples linked to known variants")
+
 }
 
 # Define the number of rows per page
@@ -446,8 +460,12 @@ rows_per_page <- 30
 # Get the total number of rows in the data frame
 total_rows <- nrow(gene_info_df)
 
+if (total_rows > 0){
+
 # Calculate the number of pages required to display all rows
 num_pages <- ceiling(total_rows / rows_per_page)
+
+
 
 # Loop through each page
 for (i in 1:num_pages) {
@@ -465,6 +483,10 @@ for (i in 1:num_pages) {
   grid.draw(table_grob)
 }
 
+} else {
+	cat("The gene info data frame is empty or has incomplete data.")
+
+}
 
 # Close the PDF file
 dev.off()

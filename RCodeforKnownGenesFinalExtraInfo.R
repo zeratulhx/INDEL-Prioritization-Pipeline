@@ -5,9 +5,13 @@ library(data.table)
 library(stringr)
 library(gridExtra)
 library(grid)
+#Deleted code that run 7_GetResultLines.sh
+#File dirs modification needed: 
+#line60:db path,line274: 6_GetResultFiles.sh
 
-
-files <- list.files(pattern = "\\.txt$", full.names = TRUE)
+#files <- list.files(pattern = "\\.txt$", full.names = TRUE)
+#To avoid file names conflit
+files<-list.files(pattern="output.txt$",full.names=TRUE)
 
 
 
@@ -281,16 +285,7 @@ if (exit_status1 == 0){
 
 #Call script to create the result files
 
-generate_result_lines_script <- "yourpath/to/7_GetResultLines.sh"
 
-exit_status2 <-system(generate_result_lines_script)
-
-if (exit_status2 == 0){
-  cat("Get result lines succesfully executed.\n")
-  
-} else {
-  cat("Script execution failed. Exit status: ", exit_status2)
-}
 
 #Generate dataframe with filtering for variants with no associated database
 #######################################################################################################

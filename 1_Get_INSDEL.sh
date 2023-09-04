@@ -4,7 +4,7 @@ MINTIE_VCF_FilePath=$(pwd)
 
 if [[ -d "$MINTIE_VCF_FilePath" ]]; then
 
-    for VCFFile in $(ls "$MINTIE_VCF_FilePath"/*.vcf); do
+    for VCFFile in ${1}; do
         # Generate unique file ID, copy the header to a newly generated output file
         header_lines_to_copy=$(head -n 7 "$VCFFile")
         sample_ID=$(grep -Eo "FORMAT[^\t]*" <<< "$header_lines_to_copy" | awk -F'\t' '{print $2}'| tr -d '\n' )
@@ -19,9 +19,6 @@ if [[ -d "$MINTIE_VCF_FilePath" ]]; then
                 echo "$line" >> "${filename}.txt"
             fi
         done < "$VCFFile"
-
-        # Remove original files
-        rm "$VCFFile"
 
     done
 else

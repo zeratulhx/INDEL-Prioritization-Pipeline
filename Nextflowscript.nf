@@ -47,7 +47,7 @@ process Run_VEP_Analysis{
 
 	output:
 	path '*'
-	publishDir params.tempDir, mode: 'copy'
+	//publishDir params.tempDir, mode: 'copy'
 
 	"""
 	

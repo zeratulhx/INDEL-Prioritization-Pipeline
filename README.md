@@ -23,7 +23,9 @@ The pipeline runs offline, but requires several large files to do so.
 - Install Nextflow: https://www.nextflow.io/docs/latest/getstarted.html
 - Install R: https://cloud.r-project.org/. 
 - Place your .vcf files in a chosen directory and set their location in `nextflow.config`.
-- Set the location for files containing VAF, control counts, and case counts in `6_GetResultFiles.sh`. These files should end in .tsv. 
+- Set the location for files containing VAF, control counts, and case counts in `6_GetResultFiles.sh`. These files should end in .tsv.
+- Set locations for temp directory in 'Nextflowscrip.nf', starts with '*'.
+- Set locations for 'a_census_db.db' and pipeline directory in the top of 'RCodeforKnownGenesFinalExtraInfo.R'.
 - Run `Insertion_Pipeline.sh`.
 - Edit 1_Get_INSDEL.sh for deletions.
 - Test files to be added. 

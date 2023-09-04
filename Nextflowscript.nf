@@ -12,8 +12,8 @@ process Get_Insertions{
     path '*'
 
     """
-	chmod +x /home/users/allstaff/pan.h/scratch/INDEL-Prioritization-Pipeline/11_Get_INSDEL.sh 
-	/home/users/allstaff/pan.h/scratch/INDEL-Prioritization-Pipeline/11_Get_INSDEL.sh  $input_vcf output/
+	chmod +x $PWD/1_Get_INSDEL.sh 
+	$PWD/11_Get_INSDEL.sh  $input_vcf output/
 	"""
 
 }
@@ -25,14 +25,14 @@ process Combine_Insertions {
 	input:
 	path output_ins
 
-	publishDir params.outputDir, mode: 'copy'
+	//publishDir params.outputDir, mode: 'copy'
 
 	output:
 	path 'Variant_info.csv'
 	
 	"""
-	chmod +x /home/users/allstaff/pan.h/scratch/INDEL-Prioritization-Pipeline/combine_files.py 
-	python /home/users/allstaff/pan.h/scratch/INDEL-Prioritization-Pipeline/combine_files.py -f ${output_ins.join(',')}
+	chmod +x $PWD/combine_files.py 
+	python $PWD/combine_files.py -f ${output_ins.join(',')}
     """
 
 } 
@@ -77,20 +77,20 @@ process Run_R_Analysis{
 
 	output:
 	
-	path 'new_df.csv'	
+	path 'summary_df.csv'	
 
 	publishDir params.outputDir, mode: 'copy'
 		
 	"""
 	module load python
 	export R_ENVIRON_USER='$HOME/scratch/R_cache'
-	chmod +x /home/users/allstaff/pan.h/scratch/INDEL-Prioritization-Pipeline/2_RScript.sh
-	export R_LIBS_USER='/home/users/allstaff/pan.h/R/x86_64-pc-linux-gnu-library/4.2/'
-	export RENV_PATHS_CACHE='$HOME/scratch/R_cache'
-	chmod +x /home/users/allstaff/pan.h/scratch/INDEL-Prioritization-Pipeline/6_GetResultFiles.sh
-	/home/users/allstaff/pan.h/scratch/INDEL-Prioritization-Pipeline/2_RScript.sh ${VEP_Files}
-	chmod +x /home/users/allstaff/pan.h/scratch/INDEL-Prioritization-Pipeline/fun.py
-	python /home/users/allstaff/pan.h/scratch/INDEL-Prioritization-Pipeline/fun.py
+	chmod +x $PWD/2_RScript.sh
+	export R_LIBS_USER='*/R/x86_64-pc-linux-gnu-library/4.2/'
+	export RENV_PATHS_CACHE='*/R_cache'
+	chmod +x $PWD/6_GetResultFiles.sh
+	$PWD/2_RScript.sh ${VEP_Files}
+	chmod +x $PWD/8_Generate_df.py
+	python $PWD/8_Generate_df.py
 	"""
 
 }

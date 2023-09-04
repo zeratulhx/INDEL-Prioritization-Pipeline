@@ -20,10 +20,11 @@ The pipeline runs offline, but requires several large files to do so.
     (https://ftp.ensembl.org/pub/release-109/variation/indexed_vep_cache/) - Bio::DB::HTS required.
 - Install SQLite: https://sqlite.org/index.html
 - Download `CosmicMutantExportCensus.tsv.gz` from https://cancer.sanger.ac.uk/cosmic/download (this file needs to be indexed based on the COSV identifier and renamed to `a_census_db.db` with a table called `a_census_table`.  Without indexing the pipeline will be very slow).
+- Download Cancer Gene Census from https://cancer.sanger.ac.uk/cosmic/download. Extract the csv, then set the directory in `nextflow.config`
 - Install Nextflow: https://www.nextflow.io/docs/latest/getstarted.html
 - Install R: https://cloud.r-project.org/.
 - Install Python
-- Place your .vcf files in a chosen directory and set their location in `nextflow.config`.
+- Place your .vcf files in a chosen directory and set their location in `nextflow.config`. 
 - Set the location for files containing VAF, control counts, and case counts in `6_GetResultFiles.sh`. These files should end in .tsv.
 - Set locations for temp directory in `Nextflowscrip.nf`, starts with `*`.
 - Set pipeline directory in `2_RScript.sh`

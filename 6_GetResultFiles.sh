@@ -1,11 +1,11 @@
 #!/bin/bash
-#src_dir should be the output dir of MINTIE
-src_dir="set/your/directory"
+src_dir="*/MINTIE_out"
 dst_dir=${PWD}
-
 while read line; do
   prefix="${line:2:7}"
+  #echo "$prefix"
   for dir in "${src_dir}"/*; do
+    #echo "$dir"
     if [[ -d "${dir}" && "${dir##*/}" =~ ^"${prefix}".* ]]; then
       echo "${prefix} matches a directory in ${src_dir}"
       result_files=$(find "${dir}" -type f -name "*_results.tsv")
@@ -19,21 +19,18 @@ while read line; do
       break
     fi
   done
-done < "${dst_dir}/filelistfornoCOSVgenes.txt"
+done < "${dst_dir}/zdf_name.txt"
 
-#Put 7_GetResultLines.sh here since nextflow will go in different dir.
+#!/bin/bash
 
 src_dir="${PWD}"
-text_file="${PWD}/filenamescontignodb.txt"
+text_file="${PWD}/zdf_filename.txt"
 dst_file="${PWD}/resultlines.txt"
-
 
 echo "Source dir : ${src_dir}"
 echo "Dest file: ${dst_file}"
 
-
 while read line; do
-  #echo "${PWD}"
   filename="${line%%	*}"
   prefix="${filename:2:5}"
   echo "The prefix is : ${prefix}"
@@ -46,8 +43,7 @@ while read line; do
       if [[ $(grep -i -e "${value}" "${tsv_file}") ]]; then
         echo "Value found in ${tsv_file}"
         grep -i -e "${value}" "${tsv_file}" | while read -r matched_line; do
-	#mkdir ${dst_file}
-  printf "%s\t%s\n" "${filename}" "${matched_line}" >> "${dst_file}"
+	printf "%s\t%s\n" "${filename}" "${matched_line}" >> "${dst_file}"
      	done
       else
         echo "Value not found in ${tsv_file}"

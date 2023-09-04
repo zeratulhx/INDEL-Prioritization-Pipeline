@@ -90,7 +90,7 @@ process Run_R_Analysis{
 	chmod +x $PWD/6_GetResultFiles.sh
 	$PWD/2_RScript.sh ${VEP_Files}
 	chmod +x $PWD/8_Generate_df.py
-	python $PWD/8_Generate_df.py
+	python $PWD/8_Generate_df.py -d ${Cosmic_tab}
 	"""
 
 }
